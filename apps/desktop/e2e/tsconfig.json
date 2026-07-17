@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.node.json",
+  "compilerOptions": { "composite": false, "types": ["node", "@playwright/test"] },
+  "include": [
+    "./**/*.ts",
+    "../playwright.config.ts",
+    "../src/renderer/src/env.d.ts",
+    "../src/shared/**/*.ts"
+  ]
+}

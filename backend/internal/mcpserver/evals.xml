@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<evals>
+  <eval id="1">
+    <question>Peça ao Reviewer para revisar a mudança e me dê a conclusão.</question>
+    <expected>Chama list_connected_agents, resolve a label Reviewer, chama delegate_task, conserva dispatch_id e encerra o turno; ao receber a notificação de conclusão, responde sem polling.</expected>
+  </eval>
+  <eval id="2">
+    <question>Envie a implementação para o agente cuja função é frontend e traga o resultado.</question>
+    <expected>Lista conexões, escolhe somente uma role frontend quando ela é única, delega, encerra o turno e usa o resultado da notificação automática.</expected>
+  </eval>
+  <eval id="3">
+    <question>O Security está offline, mas já está conectado no canvas. Peça uma auditoria e aguarde a resposta.</question>
+    <expected>Lista o target offline, chama delegate_task sem criar subagente nativo, aceita queued/auto-start, encerra o turno e aguarda a notificação automática.</expected>
+  </eval>
+  <eval id="4">
+    <question>Peça ao Reviewer para revisar. Se houver dois Reviewers, não adivinhe: explique quais são e aguarde minha escolha.</question>
+    <expected>Lista conexões; uma tentativa ambígua retorna candidatos; não delega nem usa subagente nativo e apresenta labels, roles e IDs candidatos.</expected>
+  </eval>
+  <eval id="5">
+    <question>Delegue para o Database Agent. Se ele não estiver conectado, diga quais targets realmente estão autorizados.</question>
+    <expected>Usa list_connected_agents, recebe erro de roteamento ou constata ausência, não faz fallback e apresenta apenas alternativas autorizadas.</expected>
+  </eval>
+  <eval id="6">
+    <question>Liste todos os agentes conectados, inclusive os offline, e depois peça ao de QA para executar os testes.</question>
+    <expected>Usa a lista completa sem paginação oculta, identifica QA por label/role, delega e acompanha o dispatch pelo ID.</expected>
+  </eval>
+  <eval id="7">
+    <question>Há um Reviewer e um Security Reviewer. Escolha o especialista em segurança para revisar autenticação.</question>
+    <expected>Lista conexões, usa label/role e conteúdo da tarefa para escolher Security Reviewer, delega e aguarda a notificação sem polling.</expected>
+  </eval>
+  <eval id="8">
+    <question>Peça ao implementador disponível para corrigir o bug; se todos estiverem offline, use o conectado com role mais adequada.</question>
+    <expected>Lista estados e roles, entende que offline continua válido via auto-start, escolhe um único target autorizado, delega e aguarda a notificação sem polling.</expected>
+  </eval>
+  <eval id="9">
+    <question>Envie duas tarefas diferentes ao Reviewer e apresente a resposta individual de cada uma.</question>
+    <expected>Cria dois dispatches, conserva os dois IDs, encerra o turno e associa cada notificação ao dispatch correto sem misturar as saídas.</expected>
+  </eval>
+  <eval id="10">
+    <question>Peça ao agente conectado para revisar e, se o dispatch falhar ao iniciar o provider, explique a falha sem chamar agentes internos.</question>
+    <expected>Lista conexões, tenta delegate_task, consulta o dispatch se criado, relata a falha explícita e não usa subagente nativo.</expected>
+  </eval>
+</evals>

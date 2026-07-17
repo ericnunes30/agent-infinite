@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planejamento de Funcionalidades — Infinite Canvas Agent App</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --panel: #121620;
+      --panel-2: #171c28;
+      --text: #eef2ff;
+      --muted: #9aa4b2;
+      --line: rgba(255,255,255,.09);
+      --accent: #7c5cff;
+      --accent-2: #34d399;
+      --warning: #fbbf24;
+      --danger: #fb7185;
+      --code: #0f1320;
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(124,92,255,.22), transparent 28%),
+        radial-gradient(circle at 85% 0%, rgba(52,211,153,.12), transparent 24%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 56px 0 80px;
+    }
+
+    header {
+      padding: 38px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: linear-gradient(145deg, rgba(18,22,32,.92), rgba(18,22,32,.58));
+      box-shadow: 0 24px 80px rgba(0,0,0,.36);
+      backdrop-filter: blur(18px);
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--accent-2);
+      border: 1px solid rgba(52,211,153,.28);
+      background: rgba(52,211,153,.08);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(34px, 5vw, 62px);
+      line-height: 1;
+      margin: 0 0 18px;
+      letter-spacing: -0.055em;
+    }
+
+    h2 {
+      font-size: 26px;
+      letter-spacing: -0.035em;
+      margin: 0 0 14px;
+    }
+
+    h3 {
+      font-size: 18px;
+      letter-spacing: -0.02em;
+      margin: 0 0 10px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .lead {
+      max-width: 850px;
+      font-size: 18px;
+      color: #c9d2e3;
+    }
+
+    .definition {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 18px;
+      margin: 28px 0;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(18,22,32,.82);
+      padding: 22px;
+      box-shadow: 0 14px 46px rgba(0,0,0,.22);
+    }
+
+    .card.alt {
+      background: rgba(23,28,40,.86);
+    }
+
+    .codebox {
+      background: var(--code);
+      border: 1px solid rgba(255,255,255,.08);
+      color: #d8dee9;
+      border-radius: 14px;
+      padding: 16px;
+      overflow: auto;
+      margin-top: 14px;
+      font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 28px 0;
+    }
+
+    .toc a {
+      color: #dce5ff;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      background: rgba(18,22,32,.72);
+      border-radius: 14px;
+      padding: 12px 14px;
+      transition: .2s ease;
+      font-weight: 650;
+      font-size: 14px;
+    }
+
+    .toc a:hover {
+      transform: translateY(-2px);
+      border-color: rgba(124,92,255,.45);
+      background: rgba(124,92,255,.12);
+    }
+
+    section {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(18,22,32,.72);
+      overflow: hidden;
+    }
+
+    .section-head {
+      padding: 24px 26px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-start;
+    }
+
+    .section-head p {
+      max-width: 780px;
+      margin-top: 4px;
+    }
+
+    .tag {
+      flex: 0 0 auto;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(124,92,255,.12);
+      border: 1px solid rgba(124,92,255,.28);
+      color: #d9d2ff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--line);
+    }
+
+    .feature-block {
+      background: rgba(15,19,30,.94);
+      padding: 20px;
+      min-height: 100%;
+    }
+
+    ul {
+      margin: 10px 0 0;
+      padding: 0 0 0 18px;
+      color: #d6deef;
+    }
+
+    li {
+      margin: 7px 0;
+    }
+
+    .note {
+      margin-top: 28px;
+      padding: 22px;
+      border: 1px solid rgba(251,191,36,.28);
+      background: rgba(251,191,36,.08);
+      border-radius: 20px;
+    }
+
+    .note strong {
+      color: #ffe3a3;
+    }
+
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .principle {
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.045);
+      border: 1px solid var(--line);
+    }
+
+    .principle strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    footer {
+      color: var(--muted);
+      padding: 28px 4px 0;
+      font-size: 14px;
+    }
+
+    @media (max-width: 920px) {
+      .definition,
+      .feature-grid,
+      .principles,
+      .toc {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        padding: 28px;
+      }
+
+      .section-head {
+        flex-direction: column;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        color: #111827;
+      }
+
+      .page {
+        width: auto;
+        padding: 20px;
+      }
+
+      header, section, .card, .note {
+        box-shadow: none;
+        background: #fff;
+        border-color: #d1d5db;
+      }
+
+      p, li, .lead, .muted {
+        color: #374151;
+      }
+
+      .toc {
+        display: none;
+      }
+
+      .codebox {
+        background: #f3f4f6;
+        color: #111827;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="eyebrow">Planejamento funcional · Versão reavaliada</div>
+      <h1>Infinite Canvas Agent App</h1>
+      <p class="lead">
+        Lista de funcionalidades com a premissa correta: cada <strong>workspace</strong> é uma pasta ou repositório local aberto no app, e sua configuração visual/operacional é salva dentro do próprio projeto.
+      </p>
+
+      <div class="definition">
+        <div class="card">
+          <h2>Definição base</h2>
+          <p>
+            Um workspace não é uma empresa, cliente ou espaço SaaS. Ele representa uma raiz local de trabalho: uma pasta, projeto ou repositório Git.
+          </p>
+          <div class="codebox">C:/Projetos/meu-app
+D:/Repos/minha-api
+C:/Clientes/site-institucional</div>
+        </div>
+
+        <div class="card alt">
+          <h2>Persistência</h2>
+          <p>
+            O app cria uma pasta oculta dentro do projeto para salvar canvas, nodes, edges, sessões, regras, contexto e configurações.
+          </p>
+          <div class="codebox">meu-app/
+  .agentcanvas/
+    workspace.json
+    canvas.json
+    nodes.json
+    edges.json
+    sessions/
+    logs/
+    memory/
+    workflows/</div>
+        </div>
+      </div>
+
+      <div class="principles">
+        <div class="principle">
+          <strong>Local-first</strong>
+          <p>O projeto deve funcionar localmente antes de depender de servidor.</p>
+        </div>
+        <div class="principle">
+          <strong>Canvas como core</strong>
+          <p>O canvas é o espaço visual de trabalho, não apenas decoração.</p>
+        </div>
+        <div class="principle">
+          <strong>Go como executor</strong>
+          <p>Go executa terminal, agentes, Git, arquivos e processos.</p>
+        </div>
+        <div class="principle">
+          <strong>Elixir como control plane</strong>
+          <p>Elixir coordena estado, eventos e workers, sem executar tudo diretamente.</p>
+        </div>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <a href="#workspace">1. Workspace</a>
+      <a href="#canvas">2. Canvas infinito</a>
+      <a href="#nodes">3. Nodes</a>
+      <a href="#connections">4. Conexões</a>
+      <a href="#terminal">5. Terminal</a>
+      <a href="#agents">6. Agentes</a>
+      <a href="#files">7. Arquivos e contexto</a>
+      <a href="#git">8. Git e worktrees</a>
+      <a href="#workflow">9. Workflows</a>
+      <a href="#go">10. Go Worker</a>
+      <a href="#elixir">11. Elixir Core</a>
+      <a href="#storage">12. Persistência</a>
+      <a href="#ui">13. UI/UX</a>
+      <a href="#security">14. Segurança</a>
+      <a href="#observability">15. Observabilidade</a>
+      <a href="#distribution">16. Distribuição</a>
+    </nav>
+
+    <section id="workspace">
+      <div class="section-head">
+        <div>
+          <h2>1. Workspace</h2>
+          <p>Pasta ou repositório local aberto no app. A configuração fica dentro do próprio projeto.</p>
+        </div>
+        <span class="tag">core</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Abertura e identificação</h3>
+          <ul>
+            <li>Abrir uma pasta como workspace.</li>
+            <li>Abrir um repositório Git como workspace.</li>
+            <li>Detectar automaticamente se a pasta é um repo Git.</li>
+            <li>Criar configuração inicial dentro da pasta.</li>
+            <li>Carregar configuração existente ao reabrir.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Gestão local</h3>
+          <ul>
+            <li>Lista de workspaces recentes.</li>
+            <li>Remover da lista de recentes sem apagar a pasta.</li>
+            <li>Renomear apelido local do workspace.</li>
+            <li>Resetar configuração do app naquele workspace.</li>
+            <li>Validar integridade dos arquivos de configuração.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Configurações do projeto</h3>
+          <ul>
+            <li>Definir shell padrão.</li>
+            <li>Definir modelo/agente padrão.</li>
+            <li>Definir instruções do projeto.</li>
+            <li>Definir pastas ignoradas.</li>
+            <li>Definir regras de segurança do workspace.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="canvas">
+      <div class="section-head">
+        <div>
+          <h2>2. Canvas infinito</h2>
+          <p>Espaço visual onde o usuário organiza terminais, agentes, arquivos, notas e fluxos.</p>
+        </div>
+        <span class="tag">core</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Navegação</h3>
+          <ul>
+            <li>Pan livre.</li>
+            <li>Zoom suave.</li>
+            <li>Zoom to fit.</li>
+            <li>Zoom até node/grupo.</li>
+            <li>Minimap.</li>
+            <li>Bookmarks de áreas do canvas.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Organização</h3>
+          <ul>
+            <li>Drag de nodes.</li>
+            <li>Resize de nodes.</li>
+            <li>Seleção múltipla.</li>
+            <li>Agrupamento visual.</li>
+            <li>Frames/áreas nomeadas.</li>
+            <li>Snap to grid opcional.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Performance</h3>
+          <ul>
+            <li>Renderização sob demanda.</li>
+            <li>Sem render loop global contínuo.</li>
+            <li>Nodes fora da viewport em modo adormecido.</li>
+            <li>Throttling de eventos de terminal.</li>
+            <li>Virtualização de nodes pesados.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="nodes">
+      <div class="section-head">
+        <div>
+          <h2>3. Nodes do canvas</h2>
+          <p>Blocos manipuláveis no canvas. Cada node tem posição, tamanho, tipo, estado e dados próprios.</p>
+        </div>
+        <span class="tag">core</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Nodes essenciais</h3>
+          <ul>
+            <li>Terminal Node.</li>
+            <li>Agent Node.</li>
+            <li>Prompt Node.</li>
+            <li>Note Node.</li>
+            <li>File Node.</li>
+            <li>Folder Node.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Nodes de desenvolvimento</h3>
+          <ul>
+            <li>Diff Node.</li>
+            <li>Review Node.</li>
+            <li>Git Status Node.</li>
+            <li>Code Editor Node.</li>
+            <li>Test Result Node.</li>
+            <li>Output/Artifact Node.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Nodes posteriores</h3>
+          <ul>
+            <li>Browser Node.</li>
+            <li>Scheduler Node.</li>
+            <li>Webhook Node.</li>
+            <li>API Request Node.</li>
+            <li>Memory Node.</li>
+            <li>Workflow Node.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="connections">
+      <div class="section-head">
+        <div>
+          <h2>4. Conexões entre nodes</h2>
+          <p>As conexões transformam o canvas em um grafo operacional, não só visual.</p>
+        </div>
+        <span class="tag">core</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Conexões básicas</h3>
+          <ul>
+            <li>Conectar node com node.</li>
+            <li>Portas de entrada e saída.</li>
+            <li>Conexão de texto.</li>
+            <li>Conexão prompt → agente.</li>
+            <li>Conexão arquivo → agente.</li>
+            <li>Conexão agente → terminal.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Payloads</h3>
+          <ul>
+            <li>Texto simples.</li>
+            <li>Comando.</li>
+            <li>Arquivo/caminho.</li>
+            <li>Diff.</li>
+            <li>Resultado de teste.</li>
+            <li>Evento de status.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Controle</h3>
+          <ul>
+            <li>Pausar conexão.</li>
+            <li>Executar conexão manualmente.</li>
+            <li>Logs da conexão.</li>
+            <li>Filtro simples por tipo de payload.</li>
+            <li>Gate de aprovação.</li>
+            <li>Status visual da conexão.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="terminal">
+      <div class="section-head">
+        <div>
+          <h2>5. Terminal</h2>
+          <p>Terminal real associado ao workspace, controlado pelo worker local.</p>
+        </div>
+        <span class="tag">core</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Operação</h3>
+          <ul>
+            <li>Criar terminal no canvas.</li>
+            <li>Enviar input.</li>
+            <li>Receber output em tempo real.</li>
+            <li>Redimensionar terminal.</li>
+            <li>Renomear terminal.</li>
+            <li>Encerrar processo.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Ambientes</h3>
+          <ul>
+            <li>PowerShell.</li>
+            <li>CMD.</li>
+            <li>Git Bash.</li>
+            <li>WSL.</li>
+            <li>Terminal em pasta específica.</li>
+            <li>Terminal por worktree.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Histórico</h3>
+          <ul>
+            <li>Salvar sessão.</li>
+            <li>Buscar no terminal.</li>
+            <li>Copiar output.</li>
+            <li>Exportar logs.</li>
+            <li>Detectar processo em execução.</li>
+            <li>Detectar finalização/erro.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="agents">
+      <div class="section-head">
+        <div>
+          <h2>6. Agentes de IA</h2>
+          <p>Agentes são processos/sessões com persona, modelo, contexto, permissões e estado.</p>
+        </div>
+        <span class="tag">core</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Criação</h3>
+          <ul>
+            <li>Criar Agent Node.</li>
+            <li>Escolher provider.</li>
+            <li>Escolher modelo.</li>
+            <li>Definir role/persona.</li>
+            <li>Definir prompt inicial.</li>
+            <li>Anexar arquivos ou pastas.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Execução</h3>
+          <ul>
+            <li>Rodar agente via terminal/CLI.</li>
+            <li>Rodar agente via API quando aplicável.</li>
+            <li>Pausar agente.</li>
+            <li>Parar agente.</li>
+            <li>Continuar sessão.</li>
+            <li>Duplicar agente com mesmo contexto.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Estado</h3>
+          <ul>
+            <li>Status: idle, running, waiting, error, done.</li>
+            <li>Logs por agente.</li>
+            <li>Histórico de mensagens.</li>
+            <li>Resumo da sessão.</li>
+            <li>Permissões solicitadas.</li>
+            <li>Custo/tokens quando disponível.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="files">
+      <div class="section-head">
+        <div>
+          <h2>7. Arquivos e contexto</h2>
+          <p>O app precisa entender a pasta do projeto e permitir selecionar contexto para agentes.</p>
+        </div>
+        <span class="tag">essencial</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Exploração</h3>
+          <ul>
+            <li>Árvore de arquivos.</li>
+            <li>Abrir arquivo como node.</li>
+            <li>Abrir pasta como node.</li>
+            <li>Buscar arquivos.</li>
+            <li>Filtrar por extensão.</li>
+            <li>Respeitar ignore list.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Contexto para IA</h3>
+          <ul>
+            <li>Anexar arquivo ao agente.</li>
+            <li>Anexar pasta ao agente.</li>
+            <li>Criar conjuntos de contexto.</li>
+            <li>Marcar arquivos importantes.</li>
+            <li>Gerar resumo de arquivo.</li>
+            <li>Gerar mapa do projeto.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Edição/visualização</h3>
+          <ul>
+            <li>Preview de Markdown.</li>
+            <li>Preview de imagem.</li>
+            <li>Editor Monaco para código.</li>
+            <li>Aplicar patch.</li>
+            <li>Rejeitar patch.</li>
+            <li>Ver alterações pendentes.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="git">
+      <div class="section-head">
+        <div>
+          <h2>8. Git e worktrees</h2>
+          <p>Camada importante para isolar execuções de agentes e comparar alterações.</p>
+        </div>
+        <span class="tag">diferencial</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Git básico</h3>
+          <ul>
+            <li>Detectar repo.</li>
+            <li>Exibir branch atual.</li>
+            <li>Exibir status.</li>
+            <li>Listar arquivos modificados.</li>
+            <li>Ver diff.</li>
+            <li>Criar commit.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Worktrees</h3>
+          <ul>
+            <li>Listar worktrees.</li>
+            <li>Criar worktree.</li>
+            <li>Abrir terminal em worktree.</li>
+            <li>Criar agente em worktree.</li>
+            <li>Comparar worktrees.</li>
+            <li>Remover worktree.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Review</h3>
+          <ul>
+            <li>Diff por agente.</li>
+            <li>Review Node.</li>
+            <li>Aprovar alteração.</li>
+            <li>Rejeitar alteração.</li>
+            <li>Pedir correção ao agente.</li>
+            <li>Checkpoint antes de execução.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="workflow">
+      <div class="section-head">
+        <div>
+          <h2>9. Workflows visuais</h2>
+          <p>Fluxos executáveis criados a partir dos nodes e conexões.</p>
+        </div>
+        <span class="tag">diferencial</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Execução</h3>
+          <ul>
+            <li>Executar fluxo manualmente.</li>
+            <li>Pausar fluxo.</li>
+            <li>Cancelar fluxo.</li>
+            <li>Retry de etapa.</li>
+            <li>Status por etapa.</li>
+            <li>Logs por execução.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Lógica</h3>
+          <ul>
+            <li>Etapas sequenciais.</li>
+            <li>Fan-out simples.</li>
+            <li>Fan-in simples.</li>
+            <li>Condição baseada em status.</li>
+            <li>Gate humano.</li>
+            <li>Gate de review por IA.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Templates</h3>
+          <ul>
+            <li>Workflow de implementar feature.</li>
+            <li>Workflow de revisar código.</li>
+            <li>Workflow de rodar testes.</li>
+            <li>Workflow de documentação.</li>
+            <li>Workflow de refatoração.</li>
+            <li>Salvar fluxo como template.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="go">
+      <div class="section-head">
+        <div>
+          <h2>10. Go Worker</h2>
+          <p>Worker local responsável por executar ações reais no sistema operacional.</p>
+        </div>
+        <span class="tag">infra</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Registro</h3>
+          <ul>
+            <li>Conectar ao Elixir Core.</li>
+            <li>Enviar heartbeat.</li>
+            <li>Informar capabilities.</li>
+            <li>Informar versão.</li>
+            <li>Informar sistema operacional.</li>
+            <li>Reconectar automaticamente.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Execução</h3>
+          <ul>
+            <li>Criar PTY.</li>
+            <li>Executar comando.</li>
+            <li>Controlar processos.</li>
+            <li>Executar agente CLI.</li>
+            <li>Gerenciar Git.</li>
+            <li>Ler/escrever arquivos permitidos.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Eventos</h3>
+          <ul>
+            <li>Stream de terminal.</li>
+            <li>Eventos de status.</li>
+            <li>Eventos de erro.</li>
+            <li>Eventos de processo finalizado.</li>
+            <li>Logs brutos.</li>
+            <li>Métricas básicas de uso.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="elixir">
+      <div class="section-head">
+        <div>
+          <h2>11. Elixir Core</h2>
+          <p>Control plane mínimo: coordena estado, eventos, UI e workers.</p>
+        </div>
+        <span class="tag">infra</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Estado lógico</h3>
+          <ul>
+            <li>Gerenciar workspace aberto.</li>
+            <li>Gerenciar canvas state.</li>
+            <li>Gerenciar nodes.</li>
+            <li>Gerenciar edges.</li>
+            <li>Gerenciar sessões.</li>
+            <li>Gerenciar status dos agentes.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Realtime</h3>
+          <ul>
+            <li>WebSocket com UI.</li>
+            <li>Canal com Go Worker.</li>
+            <li>Broadcast de eventos.</li>
+            <li>Registry de workers.</li>
+            <li>Fila simples de comandos.</li>
+            <li>Entrega de eventos para o canvas.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Persistência</h3>
+          <ul>
+            <li>Salvar estado no arquivo do workspace.</li>
+            <li>Carregar estado do workspace.</li>
+            <li>Event log básico.</li>
+            <li>Histórico de sessões.</li>
+            <li>Snapshots de canvas.</li>
+            <li>Validação de schema.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="storage">
+      <div class="section-head">
+        <div>
+          <h2>12. Persistência e arquivos de configuração</h2>
+          <p>Separar o que pertence ao projeto do que pertence à máquina do usuário.</p>
+        </div>
+        <span class="tag">core</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Dentro do projeto</h3>
+          <ul>
+            <li>Canvas layout.</li>
+            <li>Nodes e edges.</li>
+            <li>Roles de agentes.</li>
+            <li>Workflows.</li>
+            <li>Instruções do projeto.</li>
+            <li>Regras do workspace.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Local da máquina</h3>
+          <ul>
+            <li>Lista de workspaces recentes.</li>
+            <li>Caminhos absolutos.</li>
+            <li>Preferências de UI.</li>
+            <li>Chaves de API locais.</li>
+            <li>Configuração de shell.</li>
+            <li>Preferências do usuário.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Cuidados</h3>
+          <ul>
+            <li>Evitar caminhos absolutos no arquivo versionável.</li>
+            <li>Separar secrets do repositório.</li>
+            <li>Versionar schema.</li>
+            <li>Criar migrações de config.</li>
+            <li>Backup automático.</li>
+            <li>Recuperação em caso de arquivo corrompido.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="ui">
+      <div class="section-head">
+        <div>
+          <h2>13. UI / UX premium</h2>
+          <p>Experiência visual precisa ser rápida, bonita e com sensação de ferramenta profissional.</p>
+        </div>
+        <span class="tag">produto</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Navegação</h3>
+          <ul>
+            <li>Command palette.</li>
+            <li>Atalhos globais.</li>
+            <li>Sidebar de arquivos.</li>
+            <li>Painel de propriedades.</li>
+            <li>Painel de logs.</li>
+            <li>Busca global.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Visual</h3>
+          <ul>
+            <li>Dark mode premium.</li>
+            <li>Light mode posterior.</li>
+            <li>Temas.</li>
+            <li>Animações suaves.</li>
+            <li>Empty states bem desenhados.</li>
+            <li>Ícones consistentes.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Usabilidade</h3>
+          <ul>
+            <li>Onboarding inicial.</li>
+            <li>Templates básicos.</li>
+            <li>Modo foco.</li>
+            <li>Modo compacto.</li>
+            <li>Fullscreen.</li>
+            <li>Configuração de atalhos.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="security">
+      <div class="section-head">
+        <div>
+          <h2>14. Permissões e segurança</h2>
+          <p>Necessário porque agentes podem executar comandos, editar arquivos e acessar contexto sensível.</p>
+        </div>
+        <span class="tag">crítico</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Permissões</h3>
+          <ul>
+            <li>Aprovar execução de comando.</li>
+            <li>Aprovar edição de arquivo.</li>
+            <li>Aprovar criação/deleção de arquivo.</li>
+            <li>Aprovar acesso a pastas sensíveis.</li>
+            <li>Aprovar uso de secrets.</li>
+            <li>Modo auto-approve controlado.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Políticas</h3>
+          <ul>
+            <li>Lista de comandos bloqueados.</li>
+            <li>Lista de comandos permitidos.</li>
+            <li>Escopo por workspace.</li>
+            <li>Escopo por agente.</li>
+            <li>Escopo por pasta.</li>
+            <li>Permissões temporárias.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Auditoria</h3>
+          <ul>
+            <li>Log de comandos executados.</li>
+            <li>Log de arquivos alterados.</li>
+            <li>Log de permissões concedidas.</li>
+            <li>Histórico por agente.</li>
+            <li>Reverter alteração quando possível.</li>
+            <li>Alertas de ação perigosa.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="observability">
+      <div class="section-head">
+        <div>
+          <h2>15. Observabilidade</h2>
+          <p>Ferramentas para entender o que está rodando e diagnosticar gargalos.</p>
+        </div>
+        <span class="tag">suporte</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Logs</h3>
+          <ul>
+            <li>Logs do app.</li>
+            <li>Logs do worker.</li>
+            <li>Logs por terminal.</li>
+            <li>Logs por agente.</li>
+            <li>Logs por workflow.</li>
+            <li>Exportar pacote de diagnóstico.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Métricas</h3>
+          <ul>
+            <li>CPU/RAM do worker.</li>
+            <li>Status dos processos.</li>
+            <li>Tempo de execução.</li>
+            <li>Eventos por segundo.</li>
+            <li>Uso de tokens quando disponível.</li>
+            <li>Custo por agente quando disponível.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Debug</h3>
+          <ul>
+            <li>Inspector de eventos.</li>
+            <li>Replay de eventos.</li>
+            <li>Ver comandos pendentes.</li>
+            <li>Ver workers conectados.</li>
+            <li>Ver nodes ativos.</li>
+            <li>Detectar renderizações excessivas.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="distribution">
+      <div class="section-head">
+        <div>
+          <h2>16. Distribuição desktop</h2>
+          <p>Funcionalidades necessárias para entregar o app no Windows de forma confiável.</p>
+        </div>
+        <span class="tag">desktop</span>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Instalação</h3>
+          <ul>
+            <li>Instalador Windows.</li>
+            <li>Modo portable posterior.</li>
+            <li>Instalação do worker local.</li>
+            <li>Verificação de dependências.</li>
+            <li>Configuração inicial de shell.</li>
+            <li>Primeiro onboarding.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Atualização</h3>
+          <ul>
+            <li>Auto-update do app.</li>
+            <li>Auto-update do worker.</li>
+            <li>Checagem de versão.</li>
+            <li>Migração de configs.</li>
+            <li>Rollback de atualização posterior.</li>
+            <li>Canal stable/beta posterior.</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>CLI local</h3>
+          <ul>
+            <li>Registrar comando no PATH.</li>
+            <li>Abrir workspace via CLI.</li>
+            <li>Criar terminal via CLI.</li>
+            <li>Enviar prompt para agente.</li>
+            <li>Listar agentes ativos.</li>
+            <li>Exportar estado do workspace.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="note">
+      <strong>Observação para a próxima etapa:</strong>
+      esta lista ainda não define MVP. Ela apenas organiza funcionalidades realistas dentro da arquitetura: workspace como pasta/repositório, UI desktop como canvas, Elixir como control plane e Go como worker executor.
+    </div>
+
+    <footer>
+      Documento gerado para planejamento inicial do app de canvas infinito com agentes, terminais e workspaces locais.
+    </footer>
+  </main>
+</body>
+</html>

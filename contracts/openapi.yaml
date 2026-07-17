@@ -1,0 +1,456 @@
+openapi: 3.1.0
+info:
+  title: Agent Infinite Local API
+  version: 0.5.0
+  description: Loopback-only API used by the Agent Infinite renderer.
+servers:
+  - url: http://127.0.0.1:{port}
+    variables:
+      port: { default: '0' }
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      security: []
+      operationId: getHealth
+      responses:
+        '200':
+          description: Runtime health
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+  /api/workspaces/open:
+    post:
+      operationId: openWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties: { path: { type: string, minLength: 1 } }
+      responses:
+        '200': { $ref: '#/components/responses/SnapshotResponse' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /api/snapshot:
+    get:
+      operationId: getSnapshot
+      responses:
+        '200': { $ref: '#/components/responses/SnapshotResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/workspaces/integration:
+    patch:
+      operationId: updateWorkspaceIntegration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Integration' }
+      responses:
+        '200': { $ref: '#/components/responses/SnapshotResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /api/runtime:
+    get:
+      operationId: getRuntime
+      description: Lists live node sessions so the renderer can recover after reload or backend restart.
+      responses:
+        '200':
+          description: Current non-persistent runtime state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nodes]
+                properties:
+                  nodes:
+                    type: array
+                    items: { $ref: '#/components/schemas/NodeRuntime' }
+  /api/dispatches:
+    get:
+      operationId: listDispatches
+      description: Recovers current in-process dispatch state after renderer reconnect.
+      responses:
+        '200':
+          description: Current dispatch activity
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dispatches]
+                properties:
+                  dispatches:
+                    type: array
+                    items: { $ref: '#/components/schemas/Dispatch' }
+  /api/terminals/powershell:
+    post:
+      operationId: startPowerShellTerminal
+      description: Milestone diagnostic endpoint; node start becomes the normal terminal entry point.
+      responses:
+        '201':
+          description: ConPTY session started in the open workspace
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessionId]
+                properties:
+                  sessionId: { type: string }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+        '500': { $ref: '#/components/responses/ErrorResponse' }
+  /api/teams:
+    post:
+      operationId: createTeam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTeam' }
+      responses:
+        '201':
+          description: Team created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [team, orchestrator]
+                properties:
+                  team: { $ref: '#/components/schemas/Team' }
+                  orchestrator: { $ref: '#/components/schemas/Node' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /api/teams/{id}:
+    delete:
+      operationId: deleteTeam
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '204': { description: Team and clean worktree removed; branch preserved }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/worktrees:
+    post:
+      operationId: createWorktree
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWorktree' }
+      responses:
+        '201':
+          description: Git worktree created and linked to a team
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Worktree' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /api/worktrees/{id}:
+    delete:
+      operationId: deleteWorktree
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '204': { description: Clean worktree removed; branch preserved }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/nodes:
+    post:
+      operationId: createNode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateNode' }
+      responses:
+        '201':
+          description: Node created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Node' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /api/nodes/{id}:
+    patch:
+      operationId: updateNode
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateNode' }
+      responses:
+        '200':
+          description: Node updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Node' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+    delete:
+      operationId: deleteNode
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '204': { description: Node deleted }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+  /api/nodes/{id}/start:
+    post:
+      operationId: startNode
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Runtime session started }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/nodes/{id}/stop:
+    post:
+      operationId: stopNode
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '204': { description: Runtime session stopped }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+  /api/canvas/layout:
+    put:
+      operationId: replaceCanvasLayout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Layout' }
+      responses:
+        '200': { $ref: '#/components/responses/SnapshotResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /internal/hooks/events:
+    post:
+      operationId: receiveProviderHook
+      description: Session-scoped loopback callback used only by provider processes launched by Agent Infinite.
+      security:
+        - hookSessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HookCallback' }
+      responses:
+        '202':
+          { description: Lifecycle event accepted; may include provider hook stdout in hookOutput }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+    hookSessionAuth: { type: apiKey, in: header, name: X-Agent-Infinite-Hook-Token }
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+  responses:
+    ErrorResponse:
+      description: Request failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SnapshotResponse:
+      description: Current canvas snapshot
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Snapshot' }
+  schemas:
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
+    Error:
+      type: object
+      required: [code, message, details]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+    Snapshot:
+      type: object
+      required: [schemaVersion, workspaceId, teams, worktrees, nodes, edges, viewport, integration]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        workspaceId: { type: string }
+        teams: { type: array, items: { $ref: '#/components/schemas/Team' } }
+        worktrees: { type: array, items: { $ref: '#/components/schemas/Worktree' } }
+        nodes: { type: array, items: { $ref: '#/components/schemas/Node' } }
+        edges: { type: array, items: { $ref: '#/components/schemas/Edge' } }
+        viewport: { $ref: '#/components/schemas/Viewport' }
+        integration: { $ref: '#/components/schemas/Integration' }
+    Integration:
+      type: object
+      required: [hooks]
+      properties:
+        hooks: { type: string, enum: [auto, off, required] }
+    Team:
+      type: object
+      required: [id, name, color, branch, baseRef, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        color: { type: string }
+        branch: { type: string }
+        baseRef: { type: string }
+        createdAt: { type: string, format: date-time }
+    Worktree:
+      type: object
+      required: [id, teamId, name, branch, baseRef, createdAt]
+      properties:
+        id: { type: string }
+        teamId: { type: string }
+        name: { type: string }
+        branch: { type: string }
+        baseRef: { type: string }
+        createdAt: { type: string, format: date-time }
+    Node:
+      type: object
+      required: [id, kind, provider, teamId, label, role, autoStart, position, size]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [orchestrator, agent] }
+        provider:
+          type: string
+          enum: [claude, codex, mock]
+          description: mock is accepted only when AGENT_INFINITE_TEST_MODE=1.
+        teamId: { type: string }
+        worktreeId: { type: string }
+        label: { type: string }
+        role: { type: string }
+        autoStart: { type: boolean }
+        position: { $ref: '#/components/schemas/Point' }
+        size: { $ref: '#/components/schemas/Size' }
+    Edge:
+      type: object
+      required: [id, source, target, type]
+      properties:
+        id: { type: string }
+        source: { type: string }
+        target: { type: string }
+        type: { type: string, const: delegates_to }
+    Viewport:
+      type: object
+      required: [x, y, zoom]
+      properties:
+        x: { type: number }
+        y: { type: number }
+        zoom: { type: number, exclusiveMinimum: 0 }
+    Point:
+      type: object
+      required: [x, y]
+      properties: { x: { type: number }, y: { type: number } }
+    Size:
+      type: object
+      required: [width, height]
+      properties:
+        width: { type: number, minimum: 220 }
+        height: { type: number, minimum: 120 }
+    CreateTeam:
+      type: object
+      required: [name, color, orchestratorProvider]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        color: { type: string }
+        orchestratorProvider: { type: string, enum: [claude, codex, mock] }
+        createInitialWorktree: { type: boolean, default: true }
+    CreateWorktree:
+      type: object
+      required: [teamId, name]
+      properties:
+        teamId: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1, maxLength: 80 }
+    CreateNode:
+      allOf:
+        - { $ref: '#/components/schemas/UpdateNode' }
+        - type: object
+          required: [teamId, provider, label]
+          properties:
+            teamId: { type: string }
+            worktreeId: { type: string }
+            provider: { type: string, enum: [claude, codex, mock] }
+    UpdateNode:
+      type: object
+      properties:
+        label: { type: string, minLength: 1, maxLength: 80 }
+        role: { type: string, maxLength: 240 }
+        provider: { type: string, enum: [claude, codex, mock] }
+        autoStart: { type: boolean }
+        worktreeId: { type: string }
+    NodeRuntime:
+      type: object
+      required: [nodeId, sessionId, status, integrationMode]
+      properties:
+        nodeId: { type: string }
+        sessionId: { type: string }
+        status: { type: string, enum: [Starting, Idle, Working, Blocked, Done, Dead] }
+        integrationMode: { type: string, enum: [hooks-pending, hooks, detector, error] }
+        hookSessionId: { type: string }
+    Dispatch:
+      type: object
+      required:
+        [
+          dispatch_id,
+          source_node_id,
+          source_label,
+          target_node_id,
+          target_label,
+          task,
+          status,
+          created_at,
+          updated_at,
+          result,
+        ]
+      properties:
+        dispatch_id: { type: string }
+        source_node_id: { type: string }
+        source_label: { type: string }
+        target_node_id: { type: string }
+        target_label: { type: string }
+        target_provider: { type: string, enum: [claude, codex, mock] }
+        task: { type: string, minLength: 1, maxLength: 32768 }
+        status:
+          {
+            type: string,
+            enum: [created, queued, delivered, running, done, blocked, failed, canceled],
+          }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        notified: { type: boolean }
+        delivery_confirmed_by: { type: string, enum: [hook, detector] }
+        result:
+          type: object
+          required: [status]
+          properties:
+            status:
+              {
+                type: string,
+                enum: [created, queued, delivered, running, done, blocked, failed, canceled],
+              }
+            output: { type: string }
+            sequence: { type: integer, minimum: 0 }
+            truncated: { type: boolean }
+            completed_at: { type: string, format: date-time }
+            agent_status: { type: string, enum: [Starting, Idle, Working, Blocked, Done, Dead] }
+            error: { type: string }
+    HookCallback:
+      type: object
+      required: [sessionId, nodeId, workspaceId, provider, raw]
+      properties:
+        sessionId: { type: string }
+        nodeId: { type: string }
+        workspaceId: { type: string }
+        provider: { type: string, enum: [claude, codex, mock] }
+        event: { type: string }
+        raw: { type: object, additionalProperties: true }
+    Layout:
+      type: object
+      required: [nodes, edges, viewport]
+      properties:
+        nodes: { type: array, items: { $ref: '#/components/schemas/Node' } }
+        edges: { type: array, items: { $ref: '#/components/schemas/Edge' } }
+        viewport: { $ref: '#/components/schemas/Viewport' }

@@ -1,0 +1,31 @@
+{
+  "name": "agent-infinite",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "description": "A Windows-first local control plane for teams of coding agents.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev.ps1",
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build.ps1",
+    "dist:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package.ps1",
+    "test": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/test.ps1",
+    "test:e2e": "pnpm --filter @agent-infinite/desktop test:e2e",
+    "lint": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/lint.ps1",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.7.0",
+    "globals": "17.7.0",
+    "prettier": "3.9.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.64.0"
+  }
+}
