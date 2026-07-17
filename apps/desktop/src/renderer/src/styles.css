@@ -505,6 +505,42 @@ h1 em {
 .rail-section-heading > span:first-child {
   color: var(--text-soft);
 }
+.rail-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.rail-collapse-toggle {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+.rail-collapse-toggle:hover {
+  border-color: var(--line-strong);
+  background: var(--control);
+  color: var(--lime);
+}
+.rail-collapse-toggle svg {
+  transition: transform 180ms ease;
+}
+.rail-collapse-toggle[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+.rail-collapse-toggle:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: -2px;
+}
 .workspace-status {
   color: var(--lime);
   font-size: 7px;

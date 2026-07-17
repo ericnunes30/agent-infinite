@@ -77,6 +77,13 @@ test('mock agents dispatch, transition Working to Done, and persist across reloa
     await page.reload();
     await expect(page.locator('.canvas-stage')).toBeVisible();
 
+    const rolesToggle = page.getByRole('button', { name: 'Expandir Roles' });
+    await expect(rolesToggle).toHaveAttribute('aria-expanded', 'false');
+    await rolesToggle.click();
+    await expect(page.getByRole('button', { name: 'DevOps' })).toBeVisible();
+    await page.getByRole('button', { name: 'Recolher Roles' }).click();
+    await expect(page.getByRole('button', { name: 'DevOps' })).toHaveCount(0);
+
     const connection = await backendConnection(page);
     const sourceTeam = await api<TeamResponse>(connection, 'POST', '/api/teams', {
       name: 'Mock Control',
@@ -138,7 +145,7 @@ test('mock agents dispatch, transition Working to Done, and persist across reloa
     await expect(page.getByText('GIT WORKTREES')).toBeVisible();
     await expect(worktreeRail.getByRole('button', { name: /Mock Control Review/ })).toBeVisible();
     await expect(worktreeRail.getByRole('button', { name: /Mock Delivery/ })).toBeVisible();
-    await expect(page.getByLabel('WORKSPACE')).toBeVisible();
+    await expect(page.locator('section[aria-labelledby="workspace-title"]')).toBeVisible();
     await expect(page.getByText('1 NODES', { exact: true })).toBeVisible();
     await expect(page.locator('.worktree-list button').first()).toHaveAttribute(
       'aria-pressed',
@@ -292,7 +299,11 @@ test('mock agents dispatch, transition Working to Done, and persist across reloa
       .toBe('done');
   } finally {
     await application.close();
-    rmSync(root, { recursive: true, force: true });
+    try {
+      rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+    } catch {
+      // A child process can briefly retain the Windows temp directory after Electron closes.
+    }
   }
 });
 

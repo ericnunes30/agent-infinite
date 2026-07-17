@@ -12,7 +12,17 @@ import {
   type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Bot, FolderOpen, GitBranch, Plus, Save, Users, Wrench, X } from 'lucide-react';
+import {
+  Bot,
+  ChevronDown,
+  FolderOpen,
+  GitBranch,
+  Plus,
+  Save,
+  Users,
+  Wrench,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BackendConnection, ColorTheme } from '../../shared/ipc';
 import { AgentNode, type AgentNodeData } from './AgentNode';
@@ -47,6 +57,32 @@ interface NativeSubagentActivity {
   readonly provider: string;
   readonly status: 'running' | 'stopped';
   readonly at: string;
+}
+
+type RailSection = 'workspace' | 'worktrees' | 'newAgent' | 'roles' | 'tools';
+
+interface RailCollapseToggleProps {
+  readonly label: string;
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
+}
+
+function RailCollapseToggle({
+  label,
+  expanded,
+  onToggle,
+}: RailCollapseToggleProps): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className="rail-collapse-toggle"
+      aria-label={`${expanded ? 'Recolher' : 'Expandir'} ${label}`}
+      aria-expanded={expanded}
+      onClick={onToggle}
+    >
+      <ChevronDown size={13} aria-hidden="true" />
+    </button>
+  );
 }
 
 function toFlowNodes(snapshot: Snapshot): Node<AgentNodeData>[] {
@@ -129,6 +165,13 @@ export function CanvasWorkspace({
     () => initial.teams[0]?.id ?? null,
   );
   const [agentRolePreset, setAgentRolePreset] = useState('');
+  const [railSections, setRailSections] = useState<Record<RailSection, boolean>>({
+    workspace: true,
+    worktrees: true,
+    newAgent: true,
+    roles: false,
+    tools: false,
+  });
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved');
   const [sessions, setSessions] = useState<Record<string, RuntimeSession>>({});
@@ -469,44 +512,59 @@ export function CanvasWorkspace({
     setDialog('agent');
   }
 
+  function toggleRailSection(section: RailSection): void {
+    setRailSections((current) => ({ ...current, [section]: !current[section] }));
+  }
+
   return (
     <div className="workspace-layout">
       <aside className="team-rail">
         <section className="rail-section workspace-context" aria-labelledby="workspace-title">
           <div className="rail-section-heading">
             <span id="workspace-title">WORKSPACE</span>
-            <span className="workspace-status">ATTACHED</span>
+            <div className="rail-heading-actions">
+              <span className="workspace-status">ATTACHED</span>
+              <RailCollapseToggle
+                label="Workspace"
+                expanded={railSections.workspace}
+                onToggle={() => toggleRailSection('workspace')}
+              />
+            </div>
           </div>
-          <div className="workspace-context-card">
-            <strong>
-              {snapshot.workspacePath.split(/[\\/]/).at(-1) ?? snapshot.workspacePath}
-            </strong>
-            <span title={snapshot.workspacePath}>{snapshot.workspacePath}</span>
-          </div>
-          <div className="workspace-actions">
-            <button
-              type="button"
-              onClick={() => void saveWorkspace()}
-              disabled={saveState === 'saving'}
-            >
-              <Save size={13} />
-              {saveState === 'saving'
-                ? 'Salvando'
-                : saveState === 'error'
-                  ? 'Tentar salvar'
-                  : 'Salvar'}
-            </button>
-            <button type="button" onClick={onOpenWorkspace}>
-              <FolderOpen size={13} /> Abrir
-            </button>
-          </div>
-          <span className={`save-indicator save-${saveState}`}>
-            {saveState === 'saving'
-              ? 'SALVANDO ALTERAÇÕES'
-              : saveState === 'error'
-                ? 'FALHA AO SALVAR'
-                : 'ALTERAÇÕES SALVAS'}
-          </span>
+          {railSections.workspace && (
+            <>
+              <div className="workspace-context-card">
+                <strong>
+                  {snapshot.workspacePath.split(/[\\/]/).at(-1) ?? snapshot.workspacePath}
+                </strong>
+                <span title={snapshot.workspacePath}>{snapshot.workspacePath}</span>
+              </div>
+              <div className="workspace-actions">
+                <button
+                  type="button"
+                  onClick={() => void saveWorkspace()}
+                  disabled={saveState === 'saving'}
+                >
+                  <Save size={13} />
+                  {saveState === 'saving'
+                    ? 'Salvando'
+                    : saveState === 'error'
+                      ? 'Tentar salvar'
+                      : 'Salvar'}
+                </button>
+                <button type="button" onClick={onOpenWorkspace}>
+                  <FolderOpen size={13} /> Abrir
+                </button>
+              </div>
+              <span className={`save-indicator save-${saveState}`}>
+                {saveState === 'saving'
+                  ? 'SALVANDO ALTERAÇÕES'
+                  : saveState === 'error'
+                    ? 'FALHA AO SALVAR'
+                    : 'ALTERAÇÕES SALVAS'}
+              </span>
+            </>
+          )}
         </section>
 
         <section
@@ -515,111 +573,149 @@ export function CanvasWorkspace({
         >
           <div className="rail-section-heading rail-heading">
             <span id="worktrees-title">GIT WORKTREES</span>
-            <button
-              type="button"
-              aria-label="Create Git worktree"
-              onClick={() => setDialog('worktree')}
-            >
-              <Plus size={14} />
-            </button>
+            <div className="rail-heading-actions">
+              <RailCollapseToggle
+                label="Git Worktrees"
+                expanded={railSections.worktrees}
+                onToggle={() => toggleRailSection('worktrees')}
+              />
+              <button
+                type="button"
+                aria-label="Create Git worktree"
+                onClick={() => setDialog('worktree')}
+              >
+                <Plus size={14} />
+              </button>
+            </div>
           </div>
-          <div className="worktree-summary">
-            <GitBranch size={13} aria-hidden="true" />
-            <span>{snapshot.worktrees.length} worktrees</span>
-            <small>CANVAS SELECTION</small>
-          </div>
-          <div className="worktree-list">
-            {snapshot.worktrees.map((worktree) => {
-              const team = snapshot.teams.find((item) => item.id === worktree.teamId);
-              return (
-                <button
-                  type="button"
-                  key={worktree.id}
-                  className={selectedWorktree === worktree.id ? 'active' : ''}
-                  aria-pressed={selectedWorktree === worktree.id}
-                  onClick={() => selectWorktree(worktree.id)}
-                >
-                  <i style={{ background: team?.color ?? '#78817c' }} />
-                  <span className="worktree-name">
-                    <strong>{worktree.name}</strong>
-                    <small>
-                      TEAM: {team?.name ?? 'UNLINKED'} ·{' '}
-                      {worktree.branch.length > 0 ? worktree.branch : 'branch pending'}
-                    </small>
-                  </span>
-                  <small className="worktree-count">
-                    {snapshot.nodes.filter((node) => node.worktreeId === worktree.id).length}
-                  </small>
-                </button>
-              );
-            })}
-            {snapshot.worktrees.length === 0 && (
-              <p className="worktree-empty">Create a Git worktree and link it to an Agent Team.</p>
-            )}
-          </div>
+          {railSections.worktrees && (
+            <>
+              <div className="worktree-summary">
+                <GitBranch size={13} aria-hidden="true" />
+                <span>{snapshot.worktrees.length} worktrees</span>
+                <small>CANVAS SELECTION</small>
+              </div>
+              <div className="worktree-list">
+                {snapshot.worktrees.map((worktree) => {
+                  const team = snapshot.teams.find((item) => item.id === worktree.teamId);
+                  return (
+                    <button
+                      type="button"
+                      key={worktree.id}
+                      className={selectedWorktree === worktree.id ? 'active' : ''}
+                      aria-pressed={selectedWorktree === worktree.id}
+                      onClick={() => selectWorktree(worktree.id)}
+                    >
+                      <i style={{ background: team?.color ?? '#78817c' }} />
+                      <span className="worktree-name">
+                        <strong>{worktree.name}</strong>
+                        <small>
+                          TEAM: {team?.name ?? 'UNLINKED'} ·{' '}
+                          {worktree.branch.length > 0 ? worktree.branch : 'branch pending'}
+                        </small>
+                      </span>
+                      <small className="worktree-count">
+                        {snapshot.nodes.filter((node) => node.worktreeId === worktree.id).length}
+                      </small>
+                    </button>
+                  );
+                })}
+                {snapshot.worktrees.length === 0 && (
+                  <p className="worktree-empty">
+                    Create a Git worktree and link it to an Agent Team.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </section>
 
         <section className="rail-section rail-quick-agent" aria-labelledby="new-agent-title">
           <div className="rail-section-heading rail-heading">
             <span id="new-agent-title">NOVO AGENTE</span>
+            <div className="rail-heading-actions">
+              <RailCollapseToggle
+                label="Novo Agente"
+                expanded={railSections.newAgent}
+                onToggle={() => toggleRailSection('newAgent')}
+              />
+              <button
+                type="button"
+                aria-label="Create agent"
+                disabled={!activeWorktree}
+                onClick={() => openAgent()}
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+          {railSections.newAgent && (
             <button
               type="button"
-              aria-label="Create agent"
+              className="quick-agent-button"
               disabled={!activeWorktree}
               onClick={() => openAgent()}
             >
-              <Plus size={14} />
+              <Bot size={14} />
+              <span>
+                <strong>{activeWorktree ? 'Usar worktree ativo' : 'Selecione um worktree'}</strong>
+                <small>
+                  {activeWorktree
+                    ? `TEAM: ${activeTeam?.name ?? 'UNLINKED'}`
+                    : 'O canvas é definido por worktree'}
+                </small>
+              </span>
             </button>
-          </div>
-          <button
-            type="button"
-            className="quick-agent-button"
-            disabled={!activeWorktree}
-            onClick={() => openAgent()}
-          >
-            <Bot size={14} />
-            <span>
-              <strong>{activeWorktree ? 'Usar worktree ativo' : 'Selecione um worktree'}</strong>
-              <small>
-                {activeWorktree
-                  ? `TEAM: ${activeTeam?.name ?? 'UNLINKED'}`
-                  : 'O canvas é definido por worktree'}
-              </small>
-            </span>
-          </button>
+          )}
         </section>
 
         <section className="rail-section rail-roles" aria-labelledby="roles-title">
           <div className="rail-section-heading">
             <span id="roles-title">ROLES</span>
+            <RailCollapseToggle
+              label="Roles"
+              expanded={railSections.roles}
+              onToggle={() => toggleRailSection('roles')}
+            />
           </div>
-          <div className="role-list">
-            {['DevOps', 'Frontend', 'Backend', 'QA / Tester', 'Code Reviewer'].map((role) => (
-              <button
-                type="button"
-                key={role}
-                disabled={!activeWorktree}
-                onClick={() => openAgent(role)}
-              >
-                <Bot size={12} /> {role}
-              </button>
-            ))}
-          </div>
+          {railSections.roles && (
+            <div className="role-list">
+              {['DevOps', 'Frontend', 'Backend', 'QA / Tester', 'Code Reviewer'].map((role) => (
+                <button
+                  type="button"
+                  key={role}
+                  disabled={!activeWorktree}
+                  onClick={() => openAgent(role)}
+                >
+                  <Bot size={12} /> {role}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="rail-section rail-tools" aria-labelledby="tools-title">
           <div className="rail-section-heading">
             <span id="tools-title">FERRAMENTAS</span>
+            <RailCollapseToggle
+              label="Ferramentas"
+              expanded={railSections.tools}
+              onToggle={() => toggleRailSection('tools')}
+            />
           </div>
-          <button type="button" onClick={() => void saveWorkspace()}>
-            <Save size={12} /> Salvar canvas
-          </button>
-          <button type="button" onClick={onOpenWorkspace}>
-            <FolderOpen size={12} /> Abrir workspace
-          </button>
-          <button type="button" onClick={() => onSurfaceChange('teams')}>
-            <Wrench size={12} /> Gerenciar Agent Teams
-          </button>
+          {railSections.tools && (
+            <>
+              <button type="button" onClick={() => void saveWorkspace()}>
+                <Save size={12} /> Salvar canvas
+              </button>
+              <button type="button" onClick={onOpenWorkspace}>
+                <FolderOpen size={12} /> Abrir workspace
+              </button>
+              <button type="button" onClick={() => onSurfaceChange('teams')}>
+                <Wrench size={12} /> Gerenciar Agent Teams
+              </button>
+            </>
+          )}
         </section>
       </aside>
 
