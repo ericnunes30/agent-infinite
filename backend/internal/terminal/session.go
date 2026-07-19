@@ -36,6 +36,8 @@ type Session struct {
 	alive             bool
 	dispatchActive    bool
 	dispatchStartedAt time.Time
+	lifecycleObserved bool
+	lifecycleReady    bool
 	detector          *detector.Machine
 	screen            *detector.Screen
 	status            detector.Status
@@ -45,6 +47,7 @@ type Session struct {
 	sequence          uint64
 	integrationMode   string
 	hookSessionID     string
+	mcpConnected      bool
 }
 
 func startPowerShell(parent context.Context, workDir string) (*Session, error) {
@@ -92,6 +95,19 @@ func startSession(parent context.Context, spec agent.LaunchSpec) (*Session, erro
 func (s *Session) ID() string              { return s.id }
 func (s *Session) IntegrationMode() string { return s.integrationMode }
 func (s *Session) HookSessionID() string   { return s.hookSessionID }
+func (s *Session) MCPConnected() bool      { s.mu.Lock(); defer s.mu.Unlock(); return s.mcpConnected }
+
+func (s *Session) LifecycleReadiness() (observed, ready bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lifecycleObserved, s.lifecycleReady
+}
+
+func (s *Session) SetMCPConnected(connected bool) {
+	s.mu.Lock()
+	s.mcpConnected = connected
+	s.mu.Unlock()
+}
 
 func (s *Session) Write(data []byte) error {
 	_, err := s.cpty.Write(data)
@@ -124,6 +140,24 @@ func (s *Session) SetLifecycleStatus(status detector.Status, hold time.Duration)
 	s.lifecycleUntil = time.Now().Add(hold)
 	s.status = status
 	s.mu.Unlock()
+}
+
+// SetLifecycleReady records the provider's authoritative ability to accept a
+// prompt. It persists between hook events, unlike SetLifecycleStatus which is
+// intentionally a short-lived UI status hold.
+func (s *Session) SetLifecycleReady(ready bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lifecycleObserved = true
+	s.lifecycleReady = ready
+	if !s.alive {
+		return
+	}
+	// Ready=true is consumed by the polling detector so quiescence and visible
+	// confirmation prompts still win. Busy can be applied immediately.
+	if !ready {
+		s.status = detector.Working
+	}
 }
 
 func (s *Session) Attach() (initial []byte, live <-chan []byte, detach func()) {
@@ -195,7 +229,7 @@ func (s *Session) poll(ctx context.Context) {
 				s.mu.Unlock()
 				continue
 			}
-			signals := detector.Signals{Alive: s.alive, ActiveDescendants: hasDescendants, DispatchActive: s.dispatchActive, DispatchStartedAt: s.dispatchStartedAt, StartedAt: s.startedAt, LastOutputAt: s.lastOutputAt, Screen: screen}
+			signals := detector.Signals{Alive: s.alive, ActiveDescendants: hasDescendants, DispatchActive: s.dispatchActive, LifecycleObserved: s.lifecycleObserved, LifecycleReady: s.lifecycleReady, DispatchStartedAt: s.dispatchStartedAt, StartedAt: s.startedAt, LastOutputAt: s.lastOutputAt, Screen: screen}
 			s.status = s.detector.Evaluate(now, signals)
 			s.mu.Unlock()
 		}

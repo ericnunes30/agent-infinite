@@ -24,7 +24,12 @@ const MaxTaskBytes = 32 * 1024
 var (
 	targetReadinessTimeout = 10 * time.Minute
 	targetReadinessPoll    = 200 * time.Millisecond
+	promptPasteSettle      = 750 * time.Millisecond
+	promptSubmitAckTimeout = 750 * time.Millisecond
+	promptSubmitAckPoll    = 25 * time.Millisecond
 )
+
+const promptPasteThreshold = 1024
 
 const codexRestartMarker = "update ran successfully! please restart codex"
 
@@ -81,6 +86,7 @@ type Dispatch struct {
 	SourceLabel         string     `json:"source_label"`
 	TargetNodeID        string     `json:"target_node_id"`
 	TargetLabel         string     `json:"target_label"`
+	TargetRole          string     `json:"target_role,omitempty"`
 	TargetProvider      string     `json:"target_provider,omitempty"`
 	Task                string     `json:"task"`
 	Status              string     `json:"status"`
@@ -247,7 +253,7 @@ func (s *Service) DelegateTask(source, targetReference, task string) (Dispatch, 
 	now := time.Now().UTC()
 	dispatch := Dispatch{
 		ID: newID(), WorkspaceID: connected.WorkspaceID, SourceNodeID: source, SourceLabel: connected.Caller.Label,
-		TargetNodeID: target.ID, TargetLabel: target.Label, TargetProvider: target.Provider, Task: task,
+		TargetNodeID: target.ID, TargetLabel: target.Label, TargetRole: target.Role, TargetProvider: target.Provider, Task: task,
 		Status: "created", CreatedAt: now, UpdatedAt: now, Result: Result{Status: "created"},
 	}
 	s.mu.Lock()
@@ -480,7 +486,7 @@ func (s *Service) runDispatch(dispatchID string) {
 		s.fail(dispatchID, fmt.Sprintf("target did not become ready: %v", err))
 		return
 	}
-	envelope := fmt.Sprintf("Agent Infinite dispatch %s. Source: %s. Task: %s", dispatch.ID, dispatch.SourceLabel, dispatch.Task)
+	envelope := dispatchEnvelope(dispatch)
 	s.mu.Lock()
 	if current := s.dispatches[dispatchID]; current != nil {
 		current.baselineText = session.CleanText()
@@ -514,6 +520,10 @@ func (s *Service) runDispatch(dispatchID string) {
 			}
 		}
 	}
+}
+
+func dispatchEnvelope(dispatch Dispatch) string {
+	return fmt.Sprintf("Agent Infinite dispatch %s. Source: %s. Target: %s. Assigned role: %s. Execute this task in the current turn and return the complete result: %s", dispatch.ID, dispatch.SourceLabel, dispatch.TargetLabel, dispatch.TargetRole, dispatch.Task)
 }
 
 func (s *Service) waitForTargetReady(dispatchID string, session *terminal.Session) (*terminal.Session, error) {
@@ -817,12 +827,45 @@ func limitLines(value string, maxLines int) (string, bool) {
 	return strings.TrimRight(strings.Join(lines, "\n"), " \n"), truncated
 }
 
-func writePrompt(session *terminal.Session, text string) error {
+type promptSession interface {
+	Write([]byte) error
+	LifecycleReadiness() (observed, ready bool)
+}
+
+func writePrompt(session promptSession, text string) error {
+	observedBefore, readyBefore := session.LifecycleReadiness()
 	if err := session.Write([]byte(text)); err != nil {
 		return err
 	}
-	time.Sleep(750 * time.Millisecond)
-	return session.Write([]byte("\r"))
+	time.Sleep(promptPasteSettle)
+	if err := session.Write([]byte("\r")); err != nil {
+		return err
+	}
+	if len([]byte(text)) < promptPasteThreshold || !observedBefore || !readyBefore {
+		return nil
+	}
+
+	// Codex may turn a large injected prompt into a collapsed [Pasted Content]
+	// block. In that mode the first Enter can finalize the paste without
+	// submitting it. A successful submission is acknowledged by the
+	// UserPromptSubmit lifecycle event, which changes readiness to busy. Retry
+	// Enter only when that acknowledgement never arrives, avoiding empty turns
+	// for providers that accepted the first keypress.
+	deadline := time.NewTimer(promptSubmitAckTimeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(promptSubmitAckPoll)
+	defer ticker.Stop()
+	for {
+		observed, ready := session.LifecycleReadiness()
+		if observed && !ready {
+			return nil
+		}
+		select {
+		case <-deadline.C:
+			return session.Write([]byte("\r"))
+		case <-ticker.C:
+		}
+	}
 }
 
 func newID() string {

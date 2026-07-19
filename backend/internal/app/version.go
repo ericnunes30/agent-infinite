@@ -2,5 +2,5 @@ package app
 
 const (
 	Name    = "agent-infinite-backend"
-	Version = "0.5.0"
+	Version = "0.15.5"
 )

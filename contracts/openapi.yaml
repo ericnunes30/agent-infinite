@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Agent Infinite Local API
-  version: 0.5.0
+  version: 0.15.5
   description: Loopback-only API used by the Agent Infinite renderer.
 servers:
   - url: http://127.0.0.1:{port}
@@ -154,6 +154,26 @@ paths:
         '204': { description: Clean worktree removed; branch preserved }
         '404': { $ref: '#/components/responses/ErrorResponse' }
         '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/worktrees/{id}/templates/{templateId}/import:
+    post:
+      operationId: importTeamTemplateToWorktree
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: templateId, in: path, required: true, schema: { type: string } }
+      responses:
+        '201': { description: Team Template instantiated in the worktree }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /api/worktrees/{id}/teams/{teamId}/import:
+    post:
+      operationId: importTeamWorkflowToWorktree
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: teamId, in: path, required: true, schema: { type: string } }
+      responses:
+        '201': { description: Existing Agent Team workflow instantiated in the worktree }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
   /api/nodes:
     post:
       operationId: createNode
@@ -207,6 +227,129 @@ paths:
       responses:
         '204': { description: Runtime session stopped }
         '404': { $ref: '#/components/responses/ErrorResponse' }
+  /api/models/inventory:
+    get:
+      operationId: getModelInventory
+      responses:
+        '200':
+          description: Cached model catalog for all providers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelInventory' }
+  /api/models/scan:
+    post:
+      operationId: scanModels
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider: { type: string, enum: [claude, codex, pi, opencode] }
+      responses:
+        '200':
+          description: Refreshed model catalog
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelInventory' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /api/tools/inventory:
+    get:
+      operationId: listCapabilityInventory
+      responses:
+        '200':
+          description: Global MCP and skill inventory with redacted specifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  { items: { type: array, items: { $ref: '#/components/schemas/Capability' } } }
+  /api/tools/scan:
+    post:
+      operationId: scanProviderCapabilities
+      responses:
+        '200': { description: Discovery result; provider files are never modified }
+  /api/tools/policies:
+    patch:
+      operationId: setCapabilityPolicies
+      description: Atomically applies one policy to a filtered set of MCPs or skills.
+      responses:
+        '200': { description: Updated capability policies }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /api/tools/mcp-servers:
+    post:
+      operationId: createManagedMcpServer
+      responses:
+        { '201': { description: Managed MCP stored; secrets are omitted from the response } }
+  /api/tools/mcp-servers/{id}/policy:
+    patch:
+      operationId: setMcpPolicy
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: Updated MCP policy } }
+  /api/tools/mcp-servers/{id}:
+    patch:
+      operationId: updateManagedMcpServer
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: Managed MCP updated without exposing stored secrets } }
+    delete:
+      operationId: archiveManagedMcpServer
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '204': { description: Managed MCP archived } }
+  /api/tools/mcp-servers/{id}/test:
+    post:
+      operationId: testMcpServer
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: initialize and tools/list succeeded } }
+  /api/tools/mcp-servers/{id}/promote:
+    post:
+      operationId: promoteExternalMcpServer
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '201': { description: Managed copy created with newly supplied secrets } }
+  /api/tools/skills:
+    post:
+      operationId: createManagedSkill
+      responses: { '201': { description: Portable Markdown skill created } }
+  /api/tools/skills/{id}/policy:
+    patch:
+      operationId: setSkillPolicy
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: Updated skill policy } }
+  /api/tools/skills/{id}:
+    get:
+      operationId: getManagedSkillMarkdown
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: Canonical managed SKILL.md content } }
+    patch:
+      operationId: updateManagedSkill
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: Managed skill updated } }
+    delete:
+      operationId: archiveManagedSkill
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '204': { description: Managed skill archived } }
+  /api/tools/skills/{id}/promote:
+    post:
+      operationId: promoteExternalSkill
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '201': { description: Managed skill copy created } }
+  /api/role-profiles:
+    get:
+      operationId: listRoleProfiles
+      responses: { '200': { description: Workspace role presets } }
+    post:
+      operationId: createRoleProfile
+      responses: { '201': { description: Role preset created } }
+  /api/role-profiles/{id}:
+    patch:
+      operationId: updateRoleProfile
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: Role preset updated for future agents } }
+    delete:
+      operationId: deleteRoleProfile
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '204': { description: Unused role preset deleted } }
   /api/canvas/layout:
     put:
       operationId: replaceCanvasLayout
@@ -272,7 +415,18 @@ components:
         details: { type: object, additionalProperties: true }
     Snapshot:
       type: object
-      required: [schemaVersion, workspaceId, teams, worktrees, nodes, edges, viewport, integration]
+      required:
+        [
+          schemaVersion,
+          workspaceId,
+          teams,
+          worktrees,
+          nodes,
+          edges,
+          roleProfiles,
+          viewport,
+          integration,
+        ]
       properties:
         schemaVersion: { type: integer, const: 1 }
         workspaceId: { type: string }
@@ -280,6 +434,7 @@ components:
         worktrees: { type: array, items: { $ref: '#/components/schemas/Worktree' } }
         nodes: { type: array, items: { $ref: '#/components/schemas/Node' } }
         edges: { type: array, items: { $ref: '#/components/schemas/Edge' } }
+        roleProfiles: { type: array, items: { $ref: '#/components/schemas/RoleProfile' } }
         viewport: { $ref: '#/components/schemas/Viewport' }
         integration: { $ref: '#/components/schemas/Integration' }
     Integration:
@@ -315,12 +470,17 @@ components:
         kind: { type: string, enum: [orchestrator, agent] }
         provider:
           type: string
-          enum: [claude, codex, mock]
+          enum: [claude, codex, pi, opencode, mock]
           description: mock is accepted only when AGENT_INFINITE_TEST_MODE=1.
+        model:
+          { type: string, description: Exact provider model ID; omitted uses provider default. }
         teamId: { type: string }
         worktreeId: { type: string }
         label: { type: string }
         role: { type: string }
+        roleProfileId: { type: string }
+        mcpIds: { type: array, items: { type: string } }
+        skillIds: { type: array, items: { type: string } }
         autoStart: { type: boolean }
         position: { $ref: '#/components/schemas/Point' }
         size: { $ref: '#/components/schemas/Size' }
@@ -355,14 +515,23 @@ components:
       properties:
         name: { type: string, minLength: 1, maxLength: 80 }
         color: { type: string }
-        orchestratorProvider: { type: string, enum: [claude, codex, mock] }
+        orchestratorProvider: { type: string, enum: [claude, codex, pi, opencode, mock] }
+        orchestratorModel: { type: string }
         createInitialWorktree: { type: boolean, default: true }
     CreateWorktree:
       type: object
-      required: [teamId, name]
+      required: [name]
       properties:
-        teamId: { type: string, minLength: 1 }
+        teamId: { type: string }
         name: { type: string, minLength: 1, maxLength: 80 }
+        baseRef: { type: string, description: Branch or commit used as the base for a new branch. }
+        newBranch:
+          { type: string, description: Explicit name for the branch created with the worktree. }
+        existingBranch:
+          {
+            type: string,
+            description: Existing available branch to check out instead of creating one.,
+          }
     CreateNode:
       allOf:
         - { $ref: '#/components/schemas/UpdateNode' }
@@ -371,24 +540,110 @@ components:
           properties:
             teamId: { type: string }
             worktreeId: { type: string }
-            provider: { type: string, enum: [claude, codex, mock] }
+            provider: { type: string, enum: [claude, codex, pi, opencode, mock] }
     UpdateNode:
       type: object
       properties:
         label: { type: string, minLength: 1, maxLength: 80 }
         role: { type: string, maxLength: 240 }
-        provider: { type: string, enum: [claude, codex, mock] }
+        provider: { type: string, enum: [claude, codex, pi, opencode, mock] }
+        model: { type: string, maxLength: 240 }
         autoStart: { type: boolean }
         worktreeId: { type: string }
+        roleProfileId: { type: string }
+        mcpIds: { type: array, items: { type: string } }
+        skillIds: { type: array, items: { type: string } }
+    RoleProfile:
+      type: object
+      required: [id, name, mcpIds, skillIds]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        defaultProvider: { type: string, enum: [claude, codex, pi, opencode] }
+        model: { type: string, maxLength: 240 }
+        mcpIds: { type: array, items: { type: string } }
+        skillIds: { type: array, items: { type: string } }
+        builtin: { type: boolean }
+    ModelInventory:
+      type: object
+      required: [providers, scannedAt]
+      properties:
+        scannedAt: { type: string, format: date-time }
+        providers:
+          type: array
+          items: { $ref: '#/components/schemas/ProviderModelCatalog' }
+    ProviderModelCatalog:
+      type: object
+      required: [provider, status, scannedAt, models]
+      properties:
+        provider: { type: string, enum: [claude, codex, pi, opencode] }
+        cliVersion: { type: string }
+        defaultModel: { type: string }
+        defaultSource: { type: string }
+        status: { type: string, enum: [ok, stale, scan_error] }
+        error: { type: string }
+        scannedAt: { type: string, format: date-time }
+        models:
+          type: array
+          items: { $ref: '#/components/schemas/ProviderModel' }
+    ProviderModel:
+      type: object
+      required: [id, source, status]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        source: { type: string }
+        status: { type: string, enum: [available, missing, unverified] }
+        isDefault: { type: boolean }
+    Capability:
+      type: object
+      required: [id, kind, name, origin, provider, scope, fingerprint, status, policy, enforceable]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [mcp, skill] }
+        name: { type: string }
+        origin: { type: string, enum: [managed, external, internal] }
+        provider: { type: string, enum: [all, claude, codex, pi, opencode] }
+        scope: { type: string, enum: [user, project, plugin, app, session] }
+        fingerprint: { type: string }
+        groupId:
+          {
+            type: string,
+            description: Groups byte-identical portable skills or equivalent redacted MCP endpoints across providers.,
+          }
+        status: { type: string, enum: [new, unchanged, changed, missing, scan_error] }
+        policy: { type: string, enum: [provider_default, curated, blocked] }
+        enforceable: { type: boolean }
+        toolCount: { type: integer, minimum: 0 }
+        metadataTokens: { type: integer, minimum: 0 }
+        contentTokens: { type: integer, minimum: 0 }
+        secretNames:
+          {
+            type: array,
+            items: { type: string },
+            description: Secret names only; values are never returned.,
+          }
+        changes:
+          {
+            type: array,
+            items: { type: string },
+            description: Structural diff paths only; sensitive values are masked.,
+          }
     NodeRuntime:
       type: object
-      required: [nodeId, sessionId, status, integrationMode]
+      required: [nodeId, sessionId, status, integrationMode, mcpConnected]
       properties:
         nodeId: { type: string }
         sessionId: { type: string }
         status: { type: string, enum: [Starting, Idle, Working, Blocked, Done, Dead] }
         integrationMode: { type: string, enum: [hooks-pending, hooks, detector, error] }
         hookSessionId: { type: string }
+        mcpConnected:
+          type: boolean
+          description: True after the node-scoped Agent Infinite MCP endpoint receives provider traffic.
+        preview:
+          type: string
+          description: Sanitized tail snapshot used by inactive canvas terminals.
     Dispatch:
       type: object
       required:
@@ -410,7 +665,7 @@ components:
         source_label: { type: string }
         target_node_id: { type: string }
         target_label: { type: string }
-        target_provider: { type: string, enum: [claude, codex, mock] }
+        target_provider: { type: string, enum: [claude, codex, pi, opencode, mock] }
         task: { type: string, minLength: 1, maxLength: 32768 }
         status:
           {
@@ -444,7 +699,7 @@ components:
         sessionId: { type: string }
         nodeId: { type: string }
         workspaceId: { type: string }
-        provider: { type: string, enum: [claude, codex, mock] }
+        provider: { type: string, enum: [claude, codex, pi, opencode, mock] }
         event: { type: string }
         raw: { type: object, additionalProperties: true }
     Layout:

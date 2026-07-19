@@ -15,6 +15,7 @@ type Manager struct {
 	mu             sync.RWMutex
 	sessions       map[string]*Session
 	nodes          map[string]string
+	mcpConnected   map[string]bool
 	statusObserver func(string, detector.Status)
 	outputObserver func(string, string, uint64)
 	lifecycle      func(string, string, string)
@@ -26,6 +27,8 @@ type Runtime struct {
 	Status          detector.Status `json:"status"`
 	IntegrationMode string          `json:"integrationMode"`
 	HookSessionID   string          `json:"hookSessionId,omitempty"`
+	MCPConnected    bool            `json:"mcpConnected"`
+	Preview         string          `json:"preview,omitempty"`
 }
 
 func (m *Manager) SetStatusObserver(observer func(string, detector.Status)) {
@@ -47,7 +50,7 @@ func (m *Manager) SetLifecycleObserver(observer func(string, string, string)) {
 }
 
 func NewManager(ctx context.Context) *Manager {
-	return &Manager{ctx: ctx, sessions: make(map[string]*Session), nodes: make(map[string]string)}
+	return &Manager{ctx: ctx, sessions: make(map[string]*Session), nodes: make(map[string]string), mcpConnected: make(map[string]bool)}
 }
 
 func (m *Manager) StartNode(nodeID string, spec agent.LaunchSpec) (*Session, error) {
@@ -63,6 +66,7 @@ func (m *Manager) StartNode(nodeID string, spec agent.LaunchSpec) (*Session, err
 		return nil, err
 	}
 	m.mu.Lock()
+	session.SetMCPConnected(m.mcpConnected[nodeID])
 	m.sessions[session.ID()] = session
 	m.nodes[nodeID] = session.ID()
 	observer := m.statusObserver
@@ -76,6 +80,39 @@ func (m *Manager) StartNode(nodeID string, spec agent.LaunchSpec) (*Session, err
 		go m.watchNode(nodeID, session)
 	}
 	return session, nil
+}
+
+// MarkMCPConnected records the first successful contact from the node-scoped
+// Agent Infinite MCP endpoint. The map also closes the small startup race where
+// the provider initializes MCP before its terminal session is registered.
+func (m *Manager) MarkMCPConnected(nodeID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.mcpConnected == nil {
+		m.mcpConnected = make(map[string]bool)
+	}
+	alreadyConnected := m.mcpConnected[nodeID]
+	m.mcpConnected[nodeID] = true
+	if sessionID, ok := m.nodes[nodeID]; ok {
+		if session := m.sessions[sessionID]; session != nil {
+			session.SetMCPConnected(true)
+		}
+	}
+	return !alreadyConnected
+}
+
+// SetLifecycleReady applies an authoritative provider hook state to the live
+// node session. False is returned when the node no longer has a live session.
+func (m *Manager) SetLifecycleReady(nodeID string, ready bool) bool {
+	m.mu.RLock()
+	sessionID, ok := m.nodes[nodeID]
+	session := m.sessions[sessionID]
+	m.mu.RUnlock()
+	if !ok || session == nil {
+		return false
+	}
+	session.SetLifecycleReady(ready)
+	return true
 }
 
 func (m *Manager) watchNode(nodeID string, session *Session) {
@@ -128,6 +165,7 @@ func (m *Manager) StopNode(nodeID string) error {
 		return ErrSessionNotFound
 	}
 	delete(m.nodes, nodeID)
+	delete(m.mcpConnected, nodeID)
 	session := m.sessions[sessionID]
 	delete(m.sessions, sessionID)
 	m.mu.Unlock()
@@ -175,7 +213,7 @@ func (m *Manager) Runtimes() []Runtime {
 	result := make([]Runtime, 0, len(m.nodes))
 	for nodeID, sessionID := range m.nodes {
 		if session, ok := m.sessions[sessionID]; ok {
-			result = append(result, Runtime{NodeID: nodeID, SessionID: sessionID, Status: session.Status(), IntegrationMode: session.IntegrationMode(), HookSessionID: session.HookSessionID()})
+			result = append(result, Runtime{NodeID: nodeID, SessionID: sessionID, Status: session.Status(), IntegrationMode: session.IntegrationMode(), HookSessionID: session.HookSessionID(), MCPConnected: session.MCPConnected(), Preview: preview(session.CleanText(), 320)})
 		}
 	}
 	return result
@@ -186,6 +224,7 @@ func (m *Manager) CloseAll() {
 	sessions := m.sessions
 	m.sessions = make(map[string]*Session)
 	m.nodes = make(map[string]string)
+	m.mcpConnected = make(map[string]bool)
 	m.mu.Unlock()
 	for _, session := range sessions {
 		_ = session.Close()

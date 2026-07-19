@@ -1,9 +1,9 @@
 {
   "name": "@agent-infinite/desktop",
-  "version": "0.5.0",
+  "version": "0.15.5",
   "private": true,
   "productName": "Agent Infinite",
-  "description": "Windows desktop control plane for Claude Code and Codex agent teams.",
+  "description": "Windows desktop control plane for Claude Code, Codex, Pi, and OpenCode agent teams.",
   "author": "Agent Infinite",
   "type": "module",
   "main": "./out/main/index.js",

@@ -1,13 +1,62 @@
 import { describe, expect, it } from 'vitest';
 import {
   edgesBetweenVisibleNodes,
+  groupCapabilityItems,
   initialTeamId,
   initialWorktreeId,
+  isCapabilityAvailable,
+  isCapabilityCompatible,
   visibleNodeIds,
   wouldCreateCycle,
   type CanvasEdge,
   type CanvasNode,
 } from './domain';
+
+describe('capability compatibility', () => {
+  const base = {
+    id: 'portable',
+    kind: 'mcp' as const,
+    name: 'Portable',
+    origin: 'external' as const,
+    provider: 'claude' as const,
+    scope: 'user' as const,
+    fingerprint: 'fingerprint',
+    status: 'unchanged' as const,
+    policy: 'curated' as const,
+    enforceable: true,
+    firstSeenAt: '',
+    lastSeenAt: '',
+  };
+
+  it('allows curated MCPs and skills to be selected by another compatible provider', () => {
+    expect(isCapabilityCompatible({ ...base, spec: { command: 'server' } }, 'codex')).toBe(true);
+    expect(
+      isCapabilityCompatible({ ...base, kind: 'skill', skillPath: 'SKILL.md' }, 'opencode'),
+    ).toBe(true);
+  });
+
+  it('keeps local MCPs unavailable for Pi', () => {
+    expect(isCapabilityCompatible({ ...base, spec: { command: 'server' } }, 'pi')).toBe(false);
+    expect(
+      isCapabilityCompatible({ ...base, spec: { type: 'http', url: 'https://mcp.test' } }, 'pi'),
+    ).toBe(true);
+  });
+
+  it('groups identical fingerprints and prefers an already selected source', () => {
+    const peer = { ...base, id: 'peer', groupId: 'mcp-same' };
+    const selected = { ...base, id: 'selected', groupId: 'mcp-same' };
+    const groups = groupCapabilityItems([peer, selected], ['selected']);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.item.id).toBe('selected');
+    expect(groups[0]?.ids).toEqual(['peer', 'selected']);
+  });
+
+  it('excludes missing and scan-error capabilities from selection', () => {
+    expect(isCapabilityAvailable(base)).toBe(true);
+    expect(isCapabilityAvailable({ ...base, status: 'missing' })).toBe(false);
+    expect(isCapabilityAvailable({ ...base, status: 'scan_error' })).toBe(false);
+  });
+});
 
 describe('initial team selection', () => {
   it('uses the first team when the workspace has teams', () =>

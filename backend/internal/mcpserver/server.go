@@ -19,6 +19,7 @@ type Handler struct {
 	orchestration *orchestration.Service
 	workspace     Workspace
 	http          *mcp.StreamableHTTPHandler
+	connected     func(string)
 }
 
 func NewHandler(orchestrator *orchestration.Service, workspace Workspace) *Handler {
@@ -29,10 +30,15 @@ func NewHandler(orchestrator *orchestration.Service, workspace Workspace) *Handl
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) { h.http.ServeHTTP(w, r) }
 
+func (h *Handler) SetConnectedObserver(observer func(string)) { h.connected = observer }
+
 func (h *Handler) serverForRequest(request *http.Request) *mcp.Server {
 	source := request.PathValue("sourceNodeId")
+	if source != "" && h.connected != nil {
+		h.connected(source)
+	}
 	server := mcp.NewServer(
-		&mcp.Implementation{Name: "agent-infinite", Title: "Agent Infinite connected agents", Version: "0.5.0"},
+		&mcp.Implementation{Name: "agent-infinite", Title: "Agent Infinite connected agents", Version: "0.15.5"},
 		&mcp.ServerOptions{Instructions: h.instructions(source)},
 	)
 

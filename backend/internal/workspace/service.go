@@ -134,6 +134,8 @@ func emptySnapshot(root string) contracts.Snapshot {
 		Worktrees:     []contracts.Worktree{},
 		Nodes:         []contracts.Node{},
 		Edges:         []contracts.Edge{},
+		CustomRoles:   []string{},
+		RoleProfiles:  []contracts.RoleProfile{},
 		Viewport:      contracts.Viewport{Zoom: 1},
 		Integration:   contracts.Integration{Hooks: "auto"},
 	}
@@ -167,6 +169,39 @@ func normalizeSnapshot(snapshot *contracts.Snapshot) bool {
 		snapshot.Worktrees = []contracts.Worktree{}
 		changed = true
 	}
+	if snapshot.CustomRoles == nil {
+		snapshot.CustomRoles = []string{}
+		changed = true
+	}
+	if snapshot.RoleProfiles == nil {
+		snapshot.RoleProfiles = []contracts.RoleProfile{}
+		changed = true
+	}
+	profileNames := map[string]bool{}
+	for _, profile := range snapshot.RoleProfiles {
+		profileNames[strings.ToLower(profile.Name)] = true
+	}
+	for _, name := range snapshot.CustomRoles {
+		if profileNames[strings.ToLower(name)] {
+			continue
+		}
+		sum := sha256.Sum256([]byte("role:" + strings.ToLower(name)))
+		snapshot.RoleProfiles = append(snapshot.RoleProfiles, contracts.RoleProfile{
+			ID: "legacy-" + hex.EncodeToString(sum[:8]), Name: name,
+			MCPIDs: []string{}, SkillIDs: []string{},
+		})
+		changed = true
+	}
+	for index := range snapshot.Nodes {
+		if snapshot.Nodes[index].MCPIDs == nil {
+			snapshot.Nodes[index].MCPIDs = []string{}
+			changed = true
+		}
+		if snapshot.Nodes[index].SkillIDs == nil {
+			snapshot.Nodes[index].SkillIDs = []string{}
+			changed = true
+		}
+	}
 	for _, team := range snapshot.Teams {
 		found := false
 		for _, worktree := range snapshot.Worktrees {
@@ -184,12 +219,19 @@ func normalizeSnapshot(snapshot *contracts.Snapshot) bool {
 		})
 		changed = true
 	}
+	legacyTeams := map[string]bool{}
+	for _, team := range snapshot.Teams {
+		legacyTeams[team.ID] = team.Branch != ""
+	}
 	for index := range snapshot.Nodes {
 		if snapshot.Nodes[index].WorktreeID != "" {
 			continue
 		}
+		if !legacyTeams[snapshot.Nodes[index].TeamID] {
+			continue
+		}
 		for _, worktree := range snapshot.Worktrees {
-			if worktree.TeamID == snapshot.Nodes[index].TeamID {
+			if worktree.ID == snapshot.Nodes[index].TeamID && worktree.TeamID == snapshot.Nodes[index].TeamID {
 				snapshot.Nodes[index].WorktreeID = worktree.ID
 				changed = true
 				break
@@ -243,10 +285,22 @@ func clone(snapshot contracts.Snapshot) contracts.Snapshot {
 	worktrees := make([]contracts.Worktree, len(snapshot.Worktrees))
 	nodes := make([]contracts.Node, len(snapshot.Nodes))
 	edges := make([]contracts.Edge, len(snapshot.Edges))
+	customRoles := make([]string, len(snapshot.CustomRoles))
+	roleProfiles := make([]contracts.RoleProfile, len(snapshot.RoleProfiles))
 	copy(teams, snapshot.Teams)
 	copy(worktrees, snapshot.Worktrees)
 	copy(nodes, snapshot.Nodes)
 	copy(edges, snapshot.Edges)
-	snapshot.Teams, snapshot.Worktrees, snapshot.Nodes, snapshot.Edges = teams, worktrees, nodes, edges
+	copy(customRoles, snapshot.CustomRoles)
+	for i, profile := range snapshot.RoleProfiles {
+		profile.MCPIDs = append([]string(nil), profile.MCPIDs...)
+		profile.SkillIDs = append([]string(nil), profile.SkillIDs...)
+		roleProfiles[i] = profile
+	}
+	for i := range nodes {
+		nodes[i].MCPIDs = append([]string(nil), nodes[i].MCPIDs...)
+		nodes[i].SkillIDs = append([]string(nil), nodes[i].SkillIDs...)
+	}
+	snapshot.Teams, snapshot.Worktrees, snapshot.Nodes, snapshot.Edges, snapshot.CustomRoles, snapshot.RoleProfiles = teams, worktrees, nodes, edges, customRoles, roleProfiles
 	return snapshot
 }

@@ -25,15 +25,21 @@ const (
 )
 
 var (
-	promptPattern  = regexp.MustCompile(`^\s*(?:[❯›](?:\s+[^\r\n]*)?|>)\s*$`)
-	footerPattern  = regexp.MustCompile(`(?i)^(?:gpt|claude|gemini)[-\w.]*\b.*[·•].*$`)
-	blockedPattern = regexp.MustCompile(`(?i)(Do you want|Shall I proceed|\(y/n\)|Press Enter|Allow this|Approve)`)
+	// Pi keeps its prompt just above the "manual mode on" TUI footer.  Without
+	// recognizing that footer the terminal remains Working and queued dispatches
+	// never reach an otherwise ready Pi agent.
+	piFooterPattern = regexp.MustCompile(`(?i)^manual mode on.*shortcuts.*$`)
+	promptPattern   = regexp.MustCompile(`^\s*(?:[❯›](?:\s+[^\r\n]*)?|>)\s*$`)
+	footerPattern   = regexp.MustCompile(`(?i)^(?:gpt|claude|gemini)[-\w.]*\b.*[·•].*$`)
+	blockedPattern  = regexp.MustCompile(`(?i)(Do you want|Shall I proceed|\(y/n\)|Press Enter|Allow this|Approve)`)
 )
 
 type Signals struct {
 	Alive             bool
 	ActiveDescendants bool
 	DispatchActive    bool
+	LifecycleObserved bool
+	LifecycleReady    bool
 	DispatchStartedAt time.Time
 	StartedAt         time.Time
 	LastOutputAt      time.Time
@@ -70,6 +76,18 @@ func (m *Machine) Evaluate(now time.Time, signals Signals) Status {
 	}
 	if now.Sub(signals.LastOutputAt) < Quiescence {
 		m.status = Working
+		return m.status
+	}
+	// A provider lifecycle is more reliable than parsing its TUI. Pi, in
+	// particular, has composer layouts with no visible prompt marker. Hooks mark
+	// the session ready at SessionStart/agent_settled and busy before an agent
+	// run. The screen detector remains the fallback when hooks are unavailable.
+	if signals.LifecycleObserved && !signals.DispatchActive {
+		if signals.LifecycleReady {
+			m.status = Idle
+		} else {
+			m.status = Working
+		}
 		return m.status
 	}
 	if signals.DispatchActive && promptReady {
@@ -110,7 +128,7 @@ func screenPromptReady(screen string) bool {
 	if promptPattern.MatchString(last) {
 		return true
 	}
-	if len(nonEmpty) < 2 || !footerPattern.MatchString(last) {
+	if len(nonEmpty) < 2 || (!footerPattern.MatchString(last) && !piFooterPattern.MatchString(last)) {
 		return false
 	}
 	return promptPattern.MatchString(strings.TrimSpace(nonEmpty[len(nonEmpty)-2]))

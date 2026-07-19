@@ -1,6 +1,6 @@
 {
   "name": "agent-infinite",
-  "version": "0.5.0",
+  "version": "0.15.5",
   "private": true,
   "type": "module",
   "description": "A Windows-first local control plane for teams of coding agents.",

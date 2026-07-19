@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +23,64 @@ type fakeRuntime struct{}
 
 func (fakeRuntime) GetByNode(string) (*terminal.Session, error) {
 	return nil, terminal.ErrSessionNotFound
+}
+
+type pastePromptSession struct {
+	mu                 sync.Mutex
+	writes             []string
+	observed           bool
+	ready              bool
+	acknowledgeOnEnter int
+	enters             int
+}
+
+func (s *pastePromptSession) Write(data []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	value := string(data)
+	s.writes = append(s.writes, value)
+	if value == "\r" {
+		s.enters++
+		if s.acknowledgeOnEnter > 0 && s.enters >= s.acknowledgeOnEnter {
+			s.ready = false
+		}
+	}
+	return nil
+}
+
+func (s *pastePromptSession) LifecycleReadiness() (bool, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.observed, s.ready
+}
+
+func TestLargePasteRetriesEnterUntilLifecycleAcknowledgesSubmission(t *testing.T) {
+	previousSettle, previousTimeout, previousPoll := promptPasteSettle, promptSubmitAckTimeout, promptSubmitAckPoll
+	promptPasteSettle, promptSubmitAckTimeout, promptSubmitAckPoll = time.Millisecond, 10*time.Millisecond, time.Millisecond
+	t.Cleanup(func() {
+		promptPasteSettle, promptSubmitAckTimeout, promptSubmitAckPoll = previousSettle, previousTimeout, previousPoll
+	})
+
+	for _, test := range []struct {
+		name               string
+		acknowledgeOnEnter int
+		wantEnters         int
+	}{
+		{name: "first enter submits", acknowledgeOnEnter: 1, wantEnters: 1},
+		{name: "first enter only finalizes paste", acknowledgeOnEnter: 2, wantEnters: 2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			session := &pastePromptSession{observed: true, ready: true, acknowledgeOnEnter: test.acknowledgeOnEnter}
+			if err := writePrompt(session, strings.Repeat("x", promptPasteThreshold)); err != nil {
+				t.Fatal(err)
+			}
+			session.mu.Lock()
+			defer session.mu.Unlock()
+			if session.enters != test.wantEnters {
+				t.Fatalf("Enter writes = %d, want %d; writes = %#v", session.enters, test.wantEnters, session.writes)
+			}
+		})
+	}
 }
 
 func TestReconcileMarksInterruptedDispatchFailed(t *testing.T) {
@@ -69,6 +128,15 @@ func TestUserPromptHookConfirmsDispatchEnvelope(t *testing.T) {
 	}
 	if service.ConfirmPromptFromLifecycle("other", []byte(`{"prompt":"dispatch-id"}`)) {
 		t.Fatal("hook from a different node confirmed the dispatch")
+	}
+}
+
+func TestDispatchEnvelopeCarriesWorkerIdentityAndRole(t *testing.T) {
+	text := dispatchEnvelope(Dispatch{ID: "dispatch-id", SourceLabel: "Lead", TargetLabel: "Reviewer", TargetRole: "Review security", Task: "Inspect the patch"})
+	for _, expected := range []string{"dispatch-id", "Lead", "Reviewer", "Review security", "Inspect the patch", "current turn"} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("dispatch envelope missing %q: %s", expected, text)
+		}
 	}
 }
 

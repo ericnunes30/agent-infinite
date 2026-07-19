@@ -254,10 +254,9 @@ func prepareProvider(t *testing.T, screen *acceptanceScreen, provider string) {
 	// already recorded, submitting an empty prompt is harmless.
 	screen.write(t, "\r")
 	if provider == "codex" {
-		// Codex may open its explicit hook-review browser after the affirmative
-		// workspace choice. Auto mode deliberately does not bypass hook trust;
-		// Escape returns to the composer and exercises the detector fallback when
-		// this hook definition has not been trusted yet.
+		// The Agent Infinite disposable CODEX_HOME bypasses trust only for its own
+		// vetted hook table. Escape remains harmless here and dismisses any provider
+		// notice introduced by an installed Codex version before the dispatch.
 		time.Sleep(time.Second)
 		// ESC ESC in one PTY write is parsed as an escape sequence rather than two
 		// UI actions. Send distinct keypresses so nested event/detail browsers are

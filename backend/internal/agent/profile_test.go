@@ -56,3 +56,42 @@ func TestMockProviderIsTestModeOnly(t *testing.T) {
 		t.Fatalf("unexpected mock launch: %#v", spec)
 	}
 }
+
+func TestPiExtensionUsesScopedMCPAndLifecycleBridge(t *testing.T) {
+	text := piExtension(LaunchOptions{NodeID: "pi-node", NodeLabel: "Lead", NodeRole: "Coordinate delivery", NodeKind: "orchestrator", TeamID: "team-one", MCPBaseURL: "http://127.0.0.1:4312", MCPToken: "secret"})
+	for _, expected := range []string{"agent_infinite_delegate_task", "agent_infinite_list_connected_agents", "agent_infinite_get_dispatch_result", "agent_settled", "AGENT_INFINITE_HOOK_TOKEN", "/mcp/pi-node", "Lead", "Coordinate delivery", "team orchestrator"} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("Pi extension missing %q", expected)
+		}
+	}
+	if strings.Contains(text, "secret") {
+		t.Fatal("Pi extension must read the MCP token from the process environment")
+	}
+}
+
+func TestSessionInstructionsDefineOrchestratorAndWorkerIdentity(t *testing.T) {
+	orchestrator := sessionInstructions(LaunchOptions{
+		NodeID: "lead-id", NodeLabel: "Release Lead", NodeRole: "Coordinate the release", NodeKind: "orchestrator", TeamID: "release-team",
+		Connections: []SessionConnection{{ID: "reviewer-id", Label: "Reviewer", Role: "Review changes", Kind: "agent", Provider: "codex", Direction: "delegates_to"}},
+	})
+	for _, expected := range []string{"Release Lead", "lead-id", "Coordinate the release", "release-team", "list_connected_agents", "delegate_task", "Never create or substitute provider-native subagents", "delegates_to", "reviewer-id", "Review changes"} {
+		if !strings.Contains(orchestrator, expected) {
+			t.Fatalf("orchestrator contract missing %q: %s", expected, orchestrator)
+		}
+	}
+	worker := sessionInstructions(LaunchOptions{NodeID: "reviewer-id", NodeLabel: "Reviewer", NodeRole: "Review changes", NodeKind: "agent"})
+	for _, expected := range []string{"Reviewer", "Review changes", "worker agent", "Agent Infinite dispatch"} {
+		if !strings.Contains(worker, expected) {
+			t.Fatalf("worker contract missing %q: %s", expected, worker)
+		}
+	}
+}
+
+func TestOpenCodePluginUsesScopedLifecycleBridge(t *testing.T) {
+	text := openCodePlugin()
+	for _, expected := range []string{"session.created", "session.idle", "session.error", "AGENT_INFINITE_HOOK_TOKEN", "/internal/hooks/events"} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("OpenCode plugin missing %q", expected)
+		}
+	}
+}

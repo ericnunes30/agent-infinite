@@ -30,7 +30,7 @@ type Team struct {
 
 type Worktree struct {
 	ID        string    `json:"id"`
-	TeamID    string    `json:"teamId"`
+	TeamID    string    `json:"teamId,omitempty"`
 	Name      string    `json:"name"`
 	Branch    string    `json:"branch"`
 	BaseRef   string    `json:"baseRef"`
@@ -38,16 +38,32 @@ type Worktree struct {
 }
 
 type Node struct {
-	ID         string `json:"id"`
-	Kind       string `json:"kind"`
-	Provider   string `json:"provider"`
-	TeamID     string `json:"teamId"`
-	WorktreeID string `json:"worktreeId,omitempty"`
-	Label      string `json:"label"`
-	Role       string `json:"role"`
-	AutoStart  bool   `json:"autoStart"`
-	Position   Point  `json:"position"`
-	Size       Size   `json:"size"`
+	ID            string   `json:"id"`
+	Kind          string   `json:"kind"`
+	Provider      string   `json:"provider"`
+	Model         string   `json:"model,omitempty"`
+	TeamID        string   `json:"teamId"`
+	WorktreeID    string   `json:"worktreeId,omitempty"`
+	Label         string   `json:"label"`
+	Role          string   `json:"role"`
+	RoleProfileID string   `json:"roleProfileId,omitempty"`
+	MCPIDs        []string `json:"mcpIds,omitempty"`
+	SkillIDs      []string `json:"skillIds,omitempty"`
+	AutoStart     bool     `json:"autoStart"`
+	Position      Point    `json:"position"`
+	Size          Size     `json:"size"`
+}
+
+// RoleProfile is a reusable workspace-owned preset. Nodes copy its capability
+// selections at creation time so later profile edits never mutate live agents.
+type RoleProfile struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	DefaultProvider string   `json:"defaultProvider,omitempty"`
+	Model           string   `json:"model,omitempty"`
+	MCPIDs          []string `json:"mcpIds"`
+	SkillIDs        []string `json:"skillIds"`
+	Builtin         bool     `json:"builtin,omitempty"`
 }
 
 type Edge struct {
@@ -61,16 +77,40 @@ type Integration struct {
 	Hooks string `json:"hooks"`
 }
 
+// TeamTemplate is a reusable Team definition. It intentionally excludes
+// worktrees, sessions, dispatches, and credentials.
+type TeamTemplate struct {
+	ID                   string    `json:"id"`
+	Name                 string    `json:"name"`
+	Description          string    `json:"description,omitempty"`
+	Color                string    `json:"color"`
+	OrchestratorProvider string    `json:"orchestratorProvider"`
+	OrchestratorModel    string    `json:"orchestratorModel,omitempty"`
+	Nodes                []Node    `json:"nodes"`
+	Edges                []Edge    `json:"edges"`
+	CreatedAt            time.Time `json:"createdAt"`
+}
+
+// TeamExecution is transient runtime state. It is never persisted in canvas.json.
+type TeamExecution struct {
+	TeamID      string    `json:"teamId"`
+	WorktreeID  string    `json:"worktreeId"`
+	StartedAt   time.Time `json:"startedAt"`
+	StartedNode []string  `json:"startedNodeIds"`
+}
+
 type Snapshot struct {
-	SchemaVersion int         `json:"schemaVersion"`
-	WorkspaceID   string      `json:"workspaceId"`
-	WorkspacePath string      `json:"workspacePath,omitempty"`
-	Teams         []Team      `json:"teams"`
-	Worktrees     []Worktree  `json:"worktrees"`
-	Nodes         []Node      `json:"nodes"`
-	Edges         []Edge      `json:"edges"`
-	Viewport      Viewport    `json:"viewport"`
-	Integration   Integration `json:"integration"`
+	SchemaVersion int           `json:"schemaVersion"`
+	WorkspaceID   string        `json:"workspaceId"`
+	WorkspacePath string        `json:"workspacePath,omitempty"`
+	Teams         []Team        `json:"teams"`
+	Worktrees     []Worktree    `json:"worktrees"`
+	Nodes         []Node        `json:"nodes"`
+	Edges         []Edge        `json:"edges"`
+	CustomRoles   []string      `json:"customRoles"`
+	RoleProfiles  []RoleProfile `json:"roleProfiles"`
+	Viewport      Viewport      `json:"viewport"`
+	Integration   Integration   `json:"integration"`
 }
 
 type APIError struct {

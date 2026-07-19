@@ -6,13 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/agent-infinite/agent-infinite/backend/internal/capabilities"
 	"github.com/agent-infinite/agent-infinite/backend/internal/contracts"
 	"github.com/agent-infinite/agent-infinite/backend/internal/eventbus"
 	"github.com/agent-infinite/agent-infinite/backend/internal/hookbridge"
+	"github.com/agent-infinite/agent-infinite/backend/internal/models"
 	"github.com/agent-infinite/agent-infinite/backend/internal/orchestration"
 	"github.com/agent-infinite/agent-infinite/backend/internal/terminal"
 	"github.com/agent-infinite/agent-infinite/backend/internal/workspace"
@@ -32,12 +35,23 @@ type HTTP struct {
 	events        *eventbus.Bus
 	hooks         *hookbridge.Service
 	orchestration *orchestration.Service
+	templates     *templateStore
+	capabilities  *capabilities.Service
+	models        *models.Service
+	executions    map[string]contracts.TeamExecution
+	executionMu   sync.Mutex
 }
 
 func (h *HTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) { h.handler.ServeHTTP(w, r) }
 
 func NewHTTP(token, version, baseURL, runtimeRoot string, workspaceService *workspace.Service, terminals *terminal.Manager, worktrees *worktree.Manager, mcpHandler http.Handler, events *eventbus.Bus, hooks *hookbridge.Service, orchestrationService *orchestration.Service) *HTTP {
-	h := &HTTP{token: token, version: version, baseURL: strings.TrimRight(baseURL, "/"), runtimeRoot: runtimeRoot, workspace: workspaceService, terminals: terminals, worktrees: worktrees, events: events, hooks: hooks, orchestration: orchestrationService}
+	capabilityService := capabilities.New(filepath.Dir(runtimeRoot))
+	capabilityService.Scan("")
+	modelService := models.New(filepath.Dir(runtimeRoot))
+	h := &HTTP{token: token, version: version, baseURL: strings.TrimRight(baseURL, "/"), runtimeRoot: runtimeRoot, workspace: workspaceService, terminals: terminals, worktrees: worktrees, events: events, hooks: hooks, orchestration: orchestrationService, templates: newTemplateStore(filepath.Join(filepath.Dir(runtimeRoot), "team-templates.json")), capabilities: capabilityService, models: modelService, executions: make(map[string]contracts.TeamExecution)}
+	if version != "test" {
+		go modelService.Scan(context.Background(), "", "")
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("POST /api/workspaces/open", h.openWorkspace)
@@ -46,9 +60,43 @@ func NewHTTP(token, version, baseURL, runtimeRoot string, workspaceService *work
 	mux.HandleFunc("GET /api/runtime", h.runtime)
 	mux.HandleFunc("GET /api/dispatches", h.dispatches)
 	mux.HandleFunc("POST /api/teams", h.createTeam)
+	mux.HandleFunc("POST /api/teams/{id}/extract", h.extractTeamWorkflow)
+	mux.HandleFunc("POST /api/teams/{id}/run", h.runTeam)
+	mux.HandleFunc("GET /api/team-templates", h.listTeamTemplates)
+	mux.HandleFunc("POST /api/team-templates", h.saveTeamTemplate)
+	mux.HandleFunc("PATCH /api/team-templates/{id}", h.updateTeamTemplate)
+	mux.HandleFunc("DELETE /api/team-templates/{id}", h.deleteTeamTemplate)
+	mux.HandleFunc("POST /api/team-templates/{id}/apply", h.applyTeamTemplate)
 	mux.HandleFunc("DELETE /api/teams/{id}", h.deleteTeam)
+	mux.HandleFunc("POST /api/roles", h.createCustomRole)
+	mux.HandleFunc("DELETE /api/roles/{name}", h.deleteCustomRole)
+	mux.HandleFunc("GET /api/role-profiles", h.listRoleProfiles)
+	mux.HandleFunc("POST /api/role-profiles", h.createRoleProfile)
+	mux.HandleFunc("PATCH /api/role-profiles/{id}", h.patchRoleProfile)
+	mux.HandleFunc("DELETE /api/role-profiles/{id}", h.deleteRoleProfile)
+	mux.HandleFunc("GET /api/tools/inventory", h.capabilityInventory)
+	mux.HandleFunc("POST /api/tools/scan", h.scanCapabilities)
+	mux.HandleFunc("PATCH /api/tools/policies", h.patchCapabilityPolicies)
+	mux.HandleFunc("POST /api/tools/mcp-servers", h.upsertManagedMCP)
+	mux.HandleFunc("PATCH /api/tools/mcp-servers/{id}", h.upsertManagedMCP)
+	mux.HandleFunc("PATCH /api/tools/mcp-servers/{id}/policy", h.patchCapabilityPolicy)
+	mux.HandleFunc("POST /api/tools/mcp-servers/{id}/promote", h.promoteCapability)
+	mux.HandleFunc("POST /api/tools/mcp-servers/{id}/test", h.testMCP)
+	mux.HandleFunc("DELETE /api/tools/mcp-servers/{id}", h.archiveCapability)
+	mux.HandleFunc("POST /api/tools/skills", h.upsertManagedSkill)
+	mux.HandleFunc("PATCH /api/tools/skills/{id}", h.upsertManagedSkill)
+	mux.HandleFunc("GET /api/tools/skills/{id}", h.managedSkillContent)
+	mux.HandleFunc("PATCH /api/tools/skills/{id}/policy", h.patchCapabilityPolicy)
+	mux.HandleFunc("POST /api/tools/skills/{id}/promote", h.promoteCapability)
+	mux.HandleFunc("DELETE /api/tools/skills/{id}", h.archiveCapability)
+	mux.HandleFunc("GET /api/models/inventory", h.modelInventory)
+	mux.HandleFunc("POST /api/models/scan", h.scanModels)
 	mux.HandleFunc("POST /api/worktrees", h.createWorktree)
+	mux.HandleFunc("GET /api/git/branches", h.gitBranches)
 	mux.HandleFunc("DELETE /api/worktrees/{id}", h.deleteWorktree)
+	mux.HandleFunc("POST /api/worktrees/{id}/nodes/import", h.importNodeToWorktree)
+	mux.HandleFunc("POST /api/worktrees/{id}/templates/{templateId}/import", h.importTemplateToWorktree)
+	mux.HandleFunc("POST /api/worktrees/{id}/teams/{teamId}/import", h.importTeamToWorktree)
 	mux.HandleFunc("POST /api/nodes", h.createNode)
 	mux.HandleFunc("PATCH /api/nodes/{id}", h.patchNode)
 	mux.HandleFunc("DELETE /api/nodes/{id}", h.deleteNode)
@@ -111,13 +159,21 @@ func (h *HTTP) terminalWebSocket(w http.ResponseWriter, r *http.Request) {
 			cancel()
 			return
 		}
-		for chunk := range live {
-			if write(websocket.MessageBinary, chunk) != nil {
-				cancel()
+		for {
+			select {
+			case <-ctx.Done():
 				return
+			case chunk, ok := <-live:
+				if !ok {
+					cancel()
+					return
+				}
+				if write(websocket.MessageBinary, chunk) != nil {
+					cancel()
+					return
+				}
 			}
 		}
-		cancel()
 	}()
 	for {
 		messageType, data, err := connection.Read(ctx)
@@ -263,6 +319,10 @@ func (h *HTTP) openWorkspace(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	h.capabilities.Scan(snapshot.WorkspacePath)
+	if h.version != "test" {
+		h.models.Scan(r.Context(), snapshot.WorkspacePath, "")
+	}
 	if err := h.worktrees.Reconcile(r.Context(), snapshot); err != nil {
 		writeError(w, http.StatusConflict, "worktree_reconcile_failed", "Existing team worktrees could not be reconciled.", map[string]any{"cause": err.Error()})
 		return
@@ -271,7 +331,7 @@ func (h *HTTP) openWorkspace(w http.ResponseWriter, r *http.Request) {
 		h.events.Emit("backend.error", snapshot.WorkspaceID, map[string]any{"code": "dispatch_reconcile_failed", "message": err.Error()})
 	}
 	for _, node := range snapshot.Nodes {
-		if !node.AutoStart {
+		if !node.AutoStart || node.WorktreeID == "" {
 			continue
 		}
 		if _, startErr := h.launchNode(snapshot, node); startErr != nil {
@@ -312,6 +372,7 @@ func (h *HTTP) patchIntegration(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTP) runtime(w http.ResponseWriter, _ *http.Request) {
+	h.pruneTeamExecutions()
 	runtimes := h.terminals.Runtimes()
 	for index := range runtimes {
 		if runtimes[index].HookSessionID == "" {

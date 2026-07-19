@@ -9,6 +9,7 @@ import (
 
 	"github.com/agent-infinite/agent-infinite/backend/internal/agent"
 	"github.com/agent-infinite/agent-infinite/backend/internal/contracts"
+	"github.com/agent-infinite/agent-infinite/backend/internal/detector"
 	"github.com/agent-infinite/agent-infinite/backend/internal/terminal"
 )
 
@@ -186,6 +187,88 @@ func TestDispatchDeliversToCurrentCodexComposerPrompt(t *testing.T) {
 	result := waitDispatch(t, ctx, service, dispatch.ID)
 	if !strings.Contains(result.Result.Output, "AGENT_RESPONSE:210") {
 		t.Fatalf("dispatch output = %q", result.Result.Output)
+	}
+}
+
+func TestDispatchDeliversToPiComposerAboveManualModeFooter(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	runtime := terminal.NewManager(ctx)
+	defer runtime.CloseAll()
+	workDir := t.TempDir()
+	script := `[Console]::WriteLine('Pi ready'); [Console]::WriteLine('>'); [Console]::Write('manual mode on - ? for shortcuts'); $line = [Console]::ReadLine(); [Console]::WriteLine(); [Console]::WriteLine('RECEIVED:' + $line); Start-Sleep -Milliseconds 1200; [Console]::Write('>'); [Console]::ReadLine() | Out-Null`
+	session, err := runtime.StartNode("target", agent.LaunchSpec{
+		CommandLine: agent.WindowsCommandLine("powershell.exe", []string{"-NoLogo", "-NoProfile", "-Command", script}),
+		WorkDir:     workDir, Cleanup: func() {},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for !strings.Contains(session.CleanText(), "manual mode on") {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("Pi composer did not appear: %q", session.CleanText())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	workspace := fakeWorkspace{snapshot: contracts.Snapshot{
+		Nodes: []contracts.Node{{ID: "source", Kind: "orchestrator", Label: "Lead"}, {ID: "target", Kind: "agent", Label: "Pi worker", Provider: "pi"}},
+		Edges: []contracts.Edge{{ID: "edge", Source: "source", Target: "target", Type: "delegates_to"}},
+	}}
+	service := New(ctx, workspace, runtime)
+	dispatch, err := service.DelegateTask("source", "Pi worker", "PI_FOOTER_TASK")
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := waitDispatch(t, ctx, service, dispatch.ID)
+	if !strings.Contains(result.Result.Output, "RECEIVED:Agent Infinite dispatch") {
+		t.Fatalf("dispatch output = %q", result.Result.Output)
+	}
+}
+
+func TestDispatchDeliversToPiComposerUsingLifecycleReadiness(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	runtime := terminal.NewManager(ctx)
+	defer runtime.CloseAll()
+	workDir := t.TempDir()
+	script := `[Console]::WriteLine('Update Available'); [Console]::WriteLine('Package Update Available'); [Console]::WriteLine('----------------'); [Console]::WriteLine('C:\workspace (bug-fix)'); [Console]::Write('0.0%/150k (auto)  minimax-m3:cloud - high'); $line = [Console]::ReadLine(); [Console]::WriteLine(); [Console]::WriteLine('RECEIVED:' + $line); Start-Sleep -Milliseconds 1200; [Console]::Write('ready'); [Console]::ReadLine() | Out-Null`
+	session, err := runtime.StartNode("target", agent.LaunchSpec{
+		CommandLine: agent.WindowsCommandLine("powershell.exe", []string{"-NoLogo", "-NoProfile", "-Command", script}),
+		WorkDir:     workDir, Cleanup: func() {},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for !strings.Contains(session.CleanText(), "minimax-m3:cloud") {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("new Pi composer did not appear: %q", session.CleanText())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	if session.Status() == detector.Idle {
+		t.Fatal("visual detector unexpectedly recognized the markerless Pi composer")
+	}
+	session.SetLifecycleReady(true)
+	workspace := fakeWorkspace{snapshot: contracts.Snapshot{
+		Nodes: []contracts.Node{{ID: "source", Kind: "orchestrator", Label: "Lead"}, {ID: "target", Kind: "agent", Label: "Backend", Provider: "pi"}},
+		Edges: []contracts.Edge{{ID: "edge", Source: "source", Target: "target", Type: "delegates_to"}},
+	}}
+	service := New(ctx, workspace, runtime)
+	dispatch, err := service.DelegateTask("source", "Backend", "PI_LIFECYCLE_TASK")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if strings.Contains(session.CleanText(), "RECEIVED:Agent Infinite dispatch") {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("dispatch %s was not delivered: %q", dispatch.ID, session.CleanText())
+		case <-time.After(20 * time.Millisecond):
+		}
 	}
 }
 

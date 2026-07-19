@@ -39,6 +39,9 @@ func TestMachineCoversPublicTransitions(t *testing.T) {
 	if got := machine.Evaluate(now, base); got != Dead {
 		t.Fatalf("dead status = %s", got)
 	}
+	if !screenPromptReady("Pi is ready\n>\nmanual mode on - ? for shortcuts") {
+		t.Fatal("Pi composer followed by its footer was not recognized")
+	}
 }
 
 func TestActiveDescendantsKeepWorking(t *testing.T) {
@@ -46,6 +49,27 @@ func TestActiveDescendantsKeepWorking(t *testing.T) {
 	signals := Signals{Alive: true, ActiveDescendants: true, StartedAt: now.Add(-time.Minute), LastOutputAt: now.Add(-time.Minute), Screen: "child process running"}
 	if got := New().Evaluate(now, signals); got != Working {
 		t.Fatalf("status = %s", got)
+	}
+}
+
+func TestLifecycleReadinessHandlesPiComposerWithoutPromptMarker(t *testing.T) {
+	now := time.Now()
+	signals := Signals{
+		Alive: true, ActiveDescendants: true, LifecycleObserved: true, LifecycleReady: true,
+		StartedAt: now.Add(-time.Minute), LastOutputAt: now.Add(-time.Second),
+		Screen: "Update Available\nPackage Update Available\n----------------\nC:\\workspace (bug-fix)\n0.0%/150k (auto)  minimax-m3:cloud - high",
+	}
+	if got := New().Evaluate(now, signals); got != Idle {
+		t.Fatalf("ready Pi lifecycle status = %s, want Idle", got)
+	}
+	signals.LifecycleReady = false
+	if got := New().Evaluate(now, signals); got != Working {
+		t.Fatalf("busy Pi lifecycle status = %s, want Working", got)
+	}
+	signals.LifecycleReady = true
+	signals.Screen = "Allow this operation?"
+	if got := New().Evaluate(now, signals); got != Blocked {
+		t.Fatalf("confirmation prompt status = %s, want Blocked", got)
 	}
 }
 

@@ -29,7 +29,7 @@ export function App(): React.JSX.Element {
   const [opening, setOpening] = useState(false);
   const [attachedBackend, setAttachedBackend] = useState<string | null>(null);
   const [theme, setTheme] = useState<ColorTheme>(initialTheme);
-  const [surface, setSurface] = useState<'canvas' | 'teams'>('canvas');
+  const [surface, setSurface] = useState<'canvas' | 'teams' | 'templates'>('canvas');
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -100,7 +100,7 @@ export function App(): React.JSX.Element {
               aria-label="Gerenciar Agent Teams"
               title="Gerenciar Agent Teams"
               aria-pressed={surface === 'teams'}
-              onClick={() => setSurface((current) => (current === 'canvas' ? 'teams' : 'canvas'))}
+              onClick={() => setSurface((current) => (current === 'teams' ? 'canvas' : 'teams'))}
             >
               <Users size={15} aria-hidden="true" />
             </button>
@@ -206,7 +206,14 @@ export function App(): React.JSX.Element {
         </div>
       )}
       <footer>
-        <span>v0.5.0 / {surface === 'teams' ? 'AGENT TEAMS' : 'CANVAS'}</span>
+        <span>
+          v0.15.5 /{' '}
+          {surface === 'teams'
+            ? 'AGENT TEAMS'
+            : surface === 'templates'
+              ? 'TEAM TEMPLATES'
+              : 'CANVAS'}
+        </span>
         <span>{workspace ? 'WORKSPACE ATTACHED' : 'NO WORKSPACE ATTACHED'}</span>
       </footer>
     </main>

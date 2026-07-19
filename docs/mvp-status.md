@@ -1,7 +1,7 @@
 # Status do MVP — Agent Infinite
 
-Data de referência: 17 de julho de 2026  
-Versão de referência: `0.5.0`
+Data de referência: 19 de julho de 2026
+Versão de referência: `0.15.5`
 
 Este documento separa o escopo original do MVP, o que já foi comprovado e o que ainda impede o
 fechamento operacional da próxima entrega.
@@ -17,7 +17,7 @@ em JSON.
 
 - Workspace Git, estado `.agent-infinite` e persistência do canvas.
 - Times, worktrees, nodes, edges e filtro visual por time/worktree.
-- Terminal PowerShell/ConPTY para Claude Code e Codex.
+- Terminal PowerShell/ConPTY para Claude Code, Codex, Pi e OpenCode.
 - Hooks efêmeros por sessão, detector de terminal e recuperação após reinício.
 - Delegação Codex → Codex com retorno associado ao dispatch e sem polling repetitivo, aprovada em
   campo na versão `0.2.3`.
@@ -27,12 +27,22 @@ em JSON.
 - Barra lateral 0.3.0 entregue com cabeçalho, Workspace e seção **Git Worktrees**.
 - Teams e Git Worktrees agora são entidades separadas: um team pode possuir vários worktrees.
 - Criação de worktree, vínculo ao team e escolha do worktree pelo agente estão disponíveis na API e na UI.
+- Team Templates reutilizáveis, canvas de definição independente e execução contra um worktree escolhido.
+- Governança global de MCPs e skills para Claude, Codex, Pi e OpenCode, com políticas herdada,
+  curada e bloqueada aplicadas somente às sessões iniciadas pelo aplicativo.
+- Catálogo e seleção persistente de modelos em Roles, agentes, orquestradores e templates.
+- Ativação em lote dos terminais offline, previews de baixo consumo e expansão individual em tela cheia.
+- Exclusão segura de worktree com encerramento e remoção automática dos nodes runtime, preservando a
+  definição do Team e recusando checkouts com alterações não commitadas.
+- Prontidão do Pi orientada por lifecycle hooks, sem depender do desenho visual do compositor para
+  entregar tarefas delegadas.
 
 ## Pendências para fechar o MVP
 
-1. **Validar a instalação do instalador 0.4.0 no ambiente de campo.**
-2. **Aceite visual da nova sidebar.** Confirmar no instalador a densidade, truncamento de paths,
-   comportamento de rolagem e legibilidade em dark/light.
+1. **Validar o instalador 0.15.5 no ambiente de campo**, incluindo delegação Codex → Pi após um
+   restart completo do aplicativo e dos terminais.
+2. **Publicar a release no repositório remoto**, anexando o instalador e seu checksum.
+3. **Configurar assinatura de código e atualização automática**, que continuam fora do MVP atual.
 
 ## Entrega 0.3.0 (histórico)
 
@@ -176,3 +186,14 @@ Team em um filtro implícito do canvas.
 - Instalador: `Agent-Infinite-Setup-0.5.0-x64.exe`.
 - Tamanho: 123.943.321 bytes.
 - SHA-256: `032E454E8ABEA741B9ED4DBFFB5F2E48928DE680D228EFD4A5C1E1D25B6BCCD3`.
+
+## Entrega 0.6.0 — providers Pi e OpenCode
+
+- Pi é iniciado no terminal normal com uma extensão temporária que expõe as ferramentas de
+  comunicação do Agent Infinite e reporta o ciclo de vida da sessão.
+- OpenCode usa MCP remoto e plugin temporário por nó; a configuração e o token vivem somente no
+  runtime do processo.
+- O papel de orquestrador é independente do provider: Pi e OpenCode podem originar e receber
+  delegações através das conexões existentes do canvas.
+- OpenCode é atualizado fora do app com `npm install -g opencode-ai@latest`; Pi permanece na
+  versão instalada.

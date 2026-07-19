@@ -93,8 +93,16 @@ func TestStreamableHTTPListsOrchestrationTools(t *testing.T) {
 	defer cancel()
 	workspace := testWorkspace{snapshot: contracts.Snapshot{Nodes: []contracts.Node{{ID: "source", Kind: "orchestrator"}}, Edges: []contracts.Edge{}}}
 	service := orchestration.New(ctx, workspace, emptyRuntime{})
+	handler := NewHandler(service, workspace)
+	connected := make(chan string, 1)
+	handler.SetConnectedObserver(func(nodeID string) {
+		select {
+		case connected <- nodeID:
+		default:
+		}
+	})
 	mux := http.NewServeMux()
-	mux.Handle("/mcp/{sourceNodeId}", NewHandler(service, workspace))
+	mux.Handle("/mcp/{sourceNodeId}", handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil)
@@ -103,6 +111,14 @@ func TestStreamableHTTPListsOrchestrationTools(t *testing.T) {
 		t.Fatalf("Connect() error = %v", err)
 	}
 	defer session.Close()
+	select {
+	case nodeID := <-connected:
+		if nodeID != "source" {
+			t.Fatalf("MCP connection attributed to %q", nodeID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("MCP connection observer was not called")
+	}
 	tools, err := session.ListTools(ctx, nil)
 	if err != nil {
 		t.Fatalf("ListTools() error = %v", err)

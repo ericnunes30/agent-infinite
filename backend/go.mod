@@ -7,6 +7,7 @@ require (
 	github.com/coder/websocket v1.8.15
 	github.com/maximhq/vt10x v0.0.0-20260512083720-59f1625bf5d0
 	github.com/modelcontextprotocol/go-sdk v1.6.1
+	github.com/pelletier/go-toml/v2 v2.2.4
 	golang.org/x/sys v0.41.0
 )
 

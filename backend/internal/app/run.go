@@ -91,19 +91,32 @@ func Run(parent context.Context, stdin io.Reader, stdout, stderr io.Writer) erro
 			"hookSessionId": event.Session.ID, "provider": event.Session.Provider, "event": event.Name, "mode": event.Session.Mode,
 		})
 		switch event.Name {
+		case "SessionStart":
+			terminalManager.SetLifecycleReady(event.Session.NodeID, true)
 		case "UserPromptSubmit":
+			terminalManager.SetLifecycleReady(event.Session.NodeID, false)
 			orchestrationService.ConfirmPromptFromLifecycle(event.Session.NodeID, event.Raw)
 		case "Stop":
+			terminalManager.SetLifecycleReady(event.Session.NodeID, true)
 			orchestrationService.CompleteFromLifecycle(event.Session.NodeID, detector.Done)
+		case "Error":
+			terminalManager.SetLifecycleReady(event.Session.NodeID, false)
+			orchestrationService.CompleteFromLifecycle(event.Session.NodeID, detector.Blocked)
 		case "SubagentStart":
 			events.Emit("integration.native_subagent_started", event.Session.NodeID, map[string]any{"provider": event.Session.Provider, "hookSessionId": event.Session.ID, "details": event.Raw})
 		case "SubagentStop":
 			events.Emit("integration.native_subagent_stopped", event.Session.NodeID, map[string]any{"provider": event.Session.Provider, "hookSessionId": event.Session.ID, "details": event.Raw})
 		case "SessionEnd":
+			terminalManager.SetLifecycleReady(event.Session.NodeID, false)
 			hookService.Close(event.Session.ID)
 		}
 	})
 	mcpHandler := mcpserver.NewHandler(orchestrationService, workspaceService)
+	mcpHandler.SetConnectedObserver(func(nodeID string) {
+		if terminalManager.MarkMCPConnected(nodeID) {
+			events.Emit("integration.mcp_connected", nodeID, map[string]any{"connected": true})
+		}
+	})
 	baseURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 	httpTransport := transport.NewHTTP(token, Version, baseURL, runtimeRoot, workspaceService, terminalManager, worktreeManager, mcpHandler, events, hookService, orchestrationService)
 	orchestrationService.SetStarter(httpTransport.StartNodeByID)
